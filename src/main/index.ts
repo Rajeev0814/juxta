@@ -1,0 +1,176 @@
+import { join } from 'node:path'
+import { readFile, stat, writeFile } from 'node:fs/promises'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
+import { buildMenuTemplate, type MenuActionId } from './menu'
+import {
+  IPC,
+  type CompareRequest,
+  type CopyRequest,
+  type DeleteRequest,
+  type FileContents,
+  type MakeMatchRequest
+} from '../shared/ipc'
+import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch } from '../core/merge'
+import { DEFAULT_SETTINGS, type PersistedSettings, type WindowBounds } from '../shared/settings'
+import { loadSettings, saveSettings } from './settings'
+import { CompareService } from './compareService'
+
+const isDev = !app.isPackaged
+/** Files above this size are not loaded into the diff editor. */
+const MAX_DIFF_FILE_BYTES = 20 * 1024 * 1024
+
+let mainWindow: BrowserWindow | null = null
+let settings: PersistedSettings = DEFAULT_SETTINGS
+const compareService = new CompareService(() => mainWindow)
+
+/** Clamp saved bounds onto the current display so the window is always visible. */
+function resolveBounds(saved: WindowBounds | null): WindowBounds {
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
+  const width = Math.min(saved?.width ?? 1400, screenW - 20)
+  const height = Math.min(saved?.height ?? 900, screenH - 20)
+  const x = saved ? Math.max(0, Math.min(saved.x, screenW - width)) : Math.floor((screenW - width) / 2)
+  const y = saved ? Math.max(0, Math.min(saved.y, screenH - height)) : Math.floor((screenH - height) / 2)
+  return { x, y, width, height }
+}
+
+function createWindow(): void {
+  const bounds = resolveBounds(settings.windowBounds)
+
+  mainWindow = new BrowserWindow({
+    ...bounds,
+    minWidth: 720,
+    minHeight: 520,
+    show: false,
+    backgroundColor: '#1e1e1e',
+    title: 'Juxta',
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  })
+
+  mainWindow.on('ready-to-show', () => mainWindow?.show())
+  // Persist window geometry as it changes so the next launch restores it.
+  const persistBounds = (): void => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isMinimized()) {
+      settings = { ...settings, windowBounds: mainWindow.getBounds() }
+      void saveSettings(settings)
+    }
+  }
+  mainWindow.on('close', persistBounds)
+  mainWindow.on('closed', () => {
+    mainWindow = null
+  })
+
+  // electron-vite injects the dev server URL in development.
+  const devUrl = process.env['ELECTRON_RENDERER_URL']
+  if (isDev && devUrl) {
+    mainWindow.loadURL(devUrl)
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
+  } else {
+    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}
+
+function installMenu(): void {
+  const send = (id: MenuActionId): void => mainWindow?.webContents.send(IPC.menuAction, id)
+  const template = buildMenuTemplate(send, { isDev, isMac: process.platform === 'darwin' })
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template))
+}
+
+/** Delete a path, sending it to the OS Recycle Bin when requested. */
+async function removeEntry(targetPath: string, toTrash: boolean): Promise<void> {
+  if (toTrash) await shell.trashItem(targetPath)
+  else await deleteEntry(targetPath)
+}
+
+function registerIpc(): void {
+  ipcMain.handle(IPC.selectFolder, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openDirectory']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.selectFile, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile']
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(IPC.compare, async (_e, req: CompareRequest) => {
+    return compareService.compare(req.leftRoot, req.rightRoot, req.options)
+  })
+
+  ipcMain.handle(IPC.cancelCompare, async () => {
+    compareService.cancel()
+  })
+
+  ipcMain.handle(IPC.readFile, async (_e, path: string): Promise<FileContents> => {
+    const info = await stat(path)
+    if (info.size > MAX_DIFF_FILE_BYTES) {
+      return { path, text: '', binary: false, tooLarge: true }
+    }
+    const buf = await readFile(path)
+    // Heuristic: NUL byte in the first 8KB => treat as binary.
+    const sample = buf.subarray(0, 8192)
+    const binary = sample.includes(0)
+    return {
+      path,
+      text: binary ? '' : buf.toString('utf8'),
+      binary,
+      tooLarge: false
+    }
+  })
+
+  ipcMain.handle(IPC.writeFile, async (_e, path: string, text: string) => {
+    await writeFile(path, text, 'utf8')
+  })
+
+  ipcMain.handle(IPC.copyEntry, async (_e, req: CopyRequest) => {
+    await copyEntry(req.srcPath, req.destPath)
+  })
+
+  ipcMain.handle(IPC.deleteEntry, async (_e, req: DeleteRequest) => {
+    await removeEntry(req.path, req.toTrash)
+  })
+
+  ipcMain.handle(IPC.makeMatch, async (_e, req: MakeMatchRequest) => {
+    const plan = planMakeMatch(req.result.root, req.direction, req.result.leftRoot, req.result.rightRoot)
+    await applyMergePlan(plan, { remove: (p) => removeEntry(p, req.toTrash) })
+  })
+
+  ipcMain.handle(IPC.setTheme, async (_e, theme: 'light' | 'dark') => {
+    nativeTheme.themeSource = theme
+  })
+
+  ipcMain.handle(IPC.loadSettings, async () => settings)
+
+  ipcMain.handle(IPC.saveSettings, async (_e, incoming: PersistedSettings) => {
+    // The renderer owns UI fields; the main process owns window bounds.
+    settings = { ...incoming, windowBounds: settings.windowBounds }
+    await saveSettings(settings)
+  })
+}
+
+app.whenReady().then(async () => {
+  settings = await loadSettings()
+  nativeTheme.themeSource = settings.theme
+  registerIpc()
+  installMenu()
+  createWindow()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+})
+
+app.on('window-all-closed', () => {
+  compareService.dispose()
+  if (process.platform !== 'darwin') app.quit()
+})

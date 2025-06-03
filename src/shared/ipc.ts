@@ -1,0 +1,75 @@
+import type { CompareOptions, CompareResult, ProgressUpdate, Side } from './types'
+import type { PersistedSettings } from './settings'
+
+// Channel names used across the IPC boundary, kept in one place.
+export const IPC = {
+  selectFolder: 'dialog:selectFolder',
+  selectFile: 'dialog:selectFile',
+  compare: 'compare:run',
+  cancelCompare: 'compare:cancel',
+  compareProgress: 'compare:progress', // main -> renderer (event)
+  readFile: 'fs:readFile',
+  writeFile: 'fs:writeFile',
+  copyEntry: 'merge:copyEntry',
+  deleteEntry: 'merge:deleteEntry',
+  makeMatch: 'merge:makeMatch',
+  setTheme: 'app:setTheme',
+  loadSettings: 'settings:load',
+  saveSettings: 'settings:save',
+  menuAction: 'menu:action' // main -> renderer (event)
+} as const
+
+export interface CompareRequest {
+  leftRoot: string
+  rightRoot: string
+  options: CompareOptions
+}
+
+export interface CopyRequest {
+  /** Absolute source path. */
+  srcPath: string
+  /** Absolute destination path. */
+  destPath: string
+}
+
+export interface MakeMatchRequest {
+  result: CompareResult
+  direction: Side // 'left' => make right match left
+  /** Send deleted orphans to the Recycle Bin instead of permanently removing. */
+  toTrash: boolean
+}
+
+export interface DeleteRequest {
+  path: string
+  /** Send to the Recycle Bin instead of permanently removing. */
+  toTrash: boolean
+}
+
+export interface FileContents {
+  path: string
+  text: string
+  /** True when the file looks binary (contains NUL bytes) — diffing is skipped. */
+  binary: boolean
+  /** True when the file was too large to load into the editor. */
+  tooLarge: boolean
+}
+
+// The API surface exposed to the renderer via contextBridge.
+export interface RendererApi {
+  selectFolder(): Promise<string | null>
+  selectFile(): Promise<string | null>
+  compare(req: CompareRequest): Promise<CompareResult>
+  cancelCompare(): Promise<void>
+  onProgress(cb: (update: ProgressUpdate) => void): () => void
+  readFile(path: string): Promise<FileContents>
+  writeFile(path: string, text: string): Promise<void>
+  copyEntry(req: CopyRequest): Promise<void>
+  deleteEntry(req: DeleteRequest): Promise<void>
+  makeMatch(req: MakeMatchRequest): Promise<void>
+  setTheme(theme: 'light' | 'dark'): Promise<void>
+  /** Resolve the absolute path of a dropped folder (Electron's File.path replacement). */
+  getPathForFile(file: File): string
+  loadSettings(): Promise<PersistedSettings>
+  saveSettings(settings: PersistedSettings): Promise<void>
+  onMenuAction(cb: (action: string) => void): () => void
+}
