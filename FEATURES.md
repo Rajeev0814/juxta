@@ -15,7 +15,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 ## B. Beyond Compare parity (core)
 - ⬜ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
 - ⬜ B2. 3-way merge (files + folders) with auto-merge
-- ⬜ B3. Saved sessions + tabs
+- ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ⬜ B4. Moved / renamed detection (match by content hash)
 - ⬜ B5. Per-file-type rules / ignore comments via regex
 - ⬜ B6. Encoding & line-ending detection / conversion

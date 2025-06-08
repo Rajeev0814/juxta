@@ -8,15 +8,21 @@
   padding: 4px 6px 0 6px;
 }
 .tab-bar .tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   background: transparent;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: 6px 6px 0 0;
-  padding: 6px 14px;
+  padding: 6px 10px;
   color: var(--text-dim);
+  cursor: default;
+  max-width: 220px;
 }
 .tab-bar .tab:hover {
   color: var(--text);
+  background: var(--row-hover);
 }
 .tab-bar .tab.active {
   background: var(--bg-elev);
@@ -24,8 +30,66 @@
   color: var(--text);
   font-weight: 600;
 }
+.tab-bar .tab-icon {
+  flex: none;
+}
+.tab-bar .tab-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tab-bar .tab-close {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 3px;
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+.tab-bar .tab-close:hover {
+  background: var(--st-right-only-bg);
+  color: var(--st-right-only);
+  opacity: 1;
+}
 .tab-bar .tab-spacer {
   flex: 1;
+}
+.new-session {
+  position: relative;
+  align-self: center;
+}
+.tab-new {
+  width: 28px;
+  height: 26px;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+}
+.new-menu {
+  position: absolute;
+  top: 30px;
+  left: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  min-width: 170px;
+}
+.new-menu button {
+  border: none;
+  border-radius: 0;
+  text-align: left;
+  background: transparent;
+  padding: 8px 12px;
+}
+.new-menu button:hover {
+  background: var(--row-hover);
 }
 .tab-bar .theme-btn {
   align-self: center;
@@ -291,6 +355,7 @@
   padding: 6px 10px;
   background: var(--bg-elev);
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
 }
 .fc-name {
   font-weight: 600;
@@ -299,11 +364,19 @@
   color: var(--st-different);
   font-weight: 700;
 }
+.fc-hint {
+  color: var(--text-dim);
+  font-size: 11px;
+  margin-left: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+/* Let the action buttons participate directly in the bar's flex-wrap so they
+   wrap to a new row instead of overflowing off-screen on narrow windows. */
 .fc-actions {
-  margin-left: auto;
-  display: flex;
-  gap: 6px;
-  align-items: center;
+  display: contents;
 }
 .fc-count {
   color: var(--text-dim);

@@ -32,4 +32,36 @@ self.MonacoEnvironment = {
   }
 }
 
+// Custom diff themes: a *light* tint on the whole changed line, and a much
+// *darker/stronger* highlight on the actual changed characters (the inline
+// "main" diff), so the precise change stands out within a softly marked line.
+monaco.editor.defineTheme('juxta-dark', {
+  base: 'vs-dark',
+  inherit: true,
+  rules: [],
+  colors: {
+    'diffEditor.insertedLineBackground': '#3fb95014',
+    'diffEditor.removedLineBackground': '#f8514914',
+    'diffEditor.insertedTextBackground': '#3fb95073',
+    'diffEditor.removedTextBackground': '#f8514973',
+    'diffEditor.diagonalFill': '#ffffff12'
+  }
+})
+monaco.editor.defineTheme('juxta-light', {
+  base: 'vs',
+  inherit: true,
+  rules: [],
+  colors: {
+    'diffEditor.insertedLineBackground': '#22863a12',
+    'diffEditor.removedLineBackground': '#cb242612',
+    'diffEditor.insertedTextBackground': '#22863a66',
+    'diffEditor.removedTextBackground': '#cb242666',
+    'diffEditor.diagonalFill': '#00000012'
+  }
+})
+
+export function juxtaTheme(theme: 'light' | 'dark'): string {
+  return theme === 'dark' ? 'juxta-dark' : 'juxta-light'
+}
+
 loader.config({ monaco })
