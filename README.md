@@ -9,7 +9,9 @@ side-by-side, drill into a synchronized text diff, and merge/sync changes betwee
 - **Folder compare** — pick two roots, get a synchronized two-pane tree. Entries are classified and
   color-coded as *identical*, *different*, *left-only* or *right-only*, with a *newer* marker.
 - **File compare** — side-by-side diff (Monaco) with intra-line highlighting, synchronized
-  scrolling, and prev/next-difference navigation (`F6` / `Shift+F6`).
+  scrolling, prev/next-difference navigation (`F6` / `Shift+F6`), and section-level merge
+  (copy a block ←/→, save back).
+- **Text compare** — two editable panes; paste text into each side and the diff updates live.
 - **Merge actions** — copy a file/folder left→right or right→left, delete orphans, and one-click
   **"make folders match"** in either direction.
 - **Filters** — include/exclude by glob (`*.log`, `node_modules/`), ignore whitespace, ignore case.

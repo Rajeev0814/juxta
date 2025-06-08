@@ -1,18 +1,29 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CompareNode, Side } from '../../shared/types'
-import { DEFAULT_OPTIONS, type CompareOptions } from '../../shared/types'
+import type { CompareNode, CompareResult, Side } from '../../shared/types'
 import { listChangedFiles } from '../../shared/nav'
+import {
+  createSession,
+  sessionTitle,
+  SESSION_ICON,
+  SESSION_LABEL,
+  type Session,
+  type SessionType
+} from '../../shared/session'
 import { Toolbar } from './components/Toolbar'
 import { FolderPicker } from './components/FolderPicker'
 import { TwoPaneTree } from './components/TwoPaneTree'
 import { FileCompare } from './components/FileCompare'
+import { TextCompare } from './components/TextCompare'
 import { StatusBar } from './components/StatusBar'
 import { useCompare } from './hooks/useCompare'
 import { joinPath } from './lib/path'
 import './styles/components.css'
 
 type Theme = 'light' | 'dark'
-type Mode = 'folders' | 'files'
+
+function genId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `s-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
 
 function basename(p: string): string {
   return p.split(/[\\/]/).filter(Boolean).pop() ?? p
@@ -20,55 +31,61 @@ function basename(p: string): string {
 
 export default function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>('dark')
-  const [mode, setMode] = useState<Mode>('folders')
-  const [leftRoot, setLeftRoot] = useState('')
-  const [rightRoot, setRightRoot] = useState('')
-  const [options, setOptions] = useState<CompareOptions>(DEFAULT_OPTIONS)
   const [hideIdentical, setHideIdentical] = useState(false)
   const [useTrash, setUseTrash] = useState(true)
+
+  const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
+  const [activeId, setActiveId] = useState('session-0')
+  const [results, setResults] = useState<Record<string, CompareResult | null>>({})
+  const [showNew, setShowNew] = useState(false)
+
+  // Folder drill-down + navigation state (for the active folder session).
   const [view, setView] = useState<'folder' | 'file'>('folder')
   const [activeNode, setActiveNode] = useState<CompareNode | null>(null)
   const [selectedRelPath, setSelectedRelPath] = useState<string | null>(null)
   const [reveal, setReveal] = useState<{ relPath: string; nonce: number } | null>(null)
   const navPosRef = useRef(-1)
 
-  // Direct File Compare mode: two arbitrary files diffed without a folder pair.
-  const [leftFile, setLeftFile] = useState('')
-  const [rightFile, setRightFile] = useState('')
-  const directNode = useMemo<CompareNode | null>(() => {
-    if (!leftFile && !rightFile) return null
-    return {
-      name: basename(leftFile || rightFile),
-      relPath: basename(leftFile || rightFile),
-      kind: 'file',
-      status: 'different',
-      left: leftFile ? { path: leftFile, size: 0, mtimeMs: 0 } : undefined,
-      right: rightFile ? { path: rightFile, size: 0, mtimeMs: 0 } : undefined
-    }
-  }, [leftFile, rightFile])
-
-  const { result, comparing, progress, error, run, cancel } = useCompare()
+  const { comparing, progress, error, run, cancel } = useCompare()
   const navRef = useRef<{ next: () => void; prev: () => void } | null>(null)
   const hydratedRef = useRef(false)
+  const newSessionRef = useRef<HTMLDivElement>(null)
 
-  // Apply theme to <html> and to Electron's native chrome.
+  // Close the new-session menu on any click outside it.
+  useEffect(() => {
+    if (!showNew) return
+    const onDown = (e: MouseEvent): void => {
+      if (newSessionRef.current && !newSessionRef.current.contains(e.target as Node)) setShowNew(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [showNew])
+
+  const active = sessions.find((s) => s.id === activeId) ?? sessions[0]
+  const result = results[active.id] ?? null
+
+  const updateSession = useCallback((id: string, patch: Partial<Session>): void => {
+    setSessions((list) => list.map((s) => (s.id === id ? { ...s, ...patch } : s)))
+  }, [])
+  const updateActive = useCallback(
+    (patch: Partial<Session>) => updateSession(active.id, patch),
+    [active.id, updateSession]
+  )
+
+  // --- Theme ----------------------------------------------------------------
   useEffect(() => {
     document.documentElement.className = theme === 'dark' ? 'theme-dark' : 'theme-light'
     void window.api.setTheme(theme)
   }, [theme])
 
-  // Restore the previous session's settings once on startup.
+  // --- Settings hydrate / persist ------------------------------------------
   useEffect(() => {
     let cancelled = false
     void window.api.loadSettings().then((s) => {
       if (cancelled) return
+      setSessions(s.sessions)
+      setActiveId(s.activeSessionId)
       setTheme(s.theme)
-      setMode(s.mode)
-      setLeftRoot(s.leftRoot)
-      setRightRoot(s.rightRoot)
-      setLeftFile(s.leftFile)
-      setRightFile(s.rightFile)
-      setOptions(s.options)
       setHideIdentical(s.hideIdentical)
       setUseTrash(s.useTrash)
       hydratedRef.current = true
@@ -78,43 +95,84 @@ export default function App(): React.JSX.Element {
     }
   }, [])
 
-  // Persist settings (debounced) whenever a tracked field changes.
   useEffect(() => {
     if (!hydratedRef.current) return
     const t = setTimeout(() => {
       void window.api.saveSettings({
-        leftRoot,
-        rightRoot,
-        leftFile,
-        rightFile,
-        options,
+        sessions,
+        activeSessionId: activeId,
         theme,
-        mode,
         hideIdentical,
         useTrash,
-        windowBounds: null // owned by the main process
+        windowBounds: null
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [leftRoot, rightRoot, leftFile, rightFile, options, theme, mode, hideIdentical, useTrash])
+  }, [sessions, activeId, theme, hideIdentical, useTrash])
 
-  const runCompare = useCallback(() => {
-    if (!leftRoot || !rightRoot) return
+  // Reset drill-down/navigation when switching sessions.
+  useEffect(() => {
     setView('folder')
     setActiveNode(null)
-    void run(leftRoot, rightRoot, options)
-  }, [leftRoot, rightRoot, options, run])
+    setSelectedRelPath(null)
+    setReveal(null)
+    navPosRef.current = -1
+  }, [activeId])
 
-  const refresh = useCallback(() => {
-    if (leftRoot && rightRoot) void run(leftRoot, rightRoot, options)
-  }, [leftRoot, rightRoot, options, run])
+  // --- Session tab operations ----------------------------------------------
+  const addSession = useCallback((type: SessionType): void => {
+    const s = createSession(type, genId())
+    setSessions((list) => [...list, s])
+    setActiveId(s.id)
+    setShowNew(false)
+  }, [])
+
+  const closeSession = useCallback(
+    (id: string): void => {
+      setSessions((list) => {
+        const idx = list.findIndex((s) => s.id === id)
+        const next = list.filter((s) => s.id !== id)
+        const final = next.length > 0 ? next : [createSession('folders', genId())]
+        setActiveId((curr) => {
+          if (curr !== id) return curr
+          const neighbor = final[Math.max(0, Math.min(idx, final.length - 1))]
+          return neighbor.id
+        })
+        return final
+      })
+      setResults((r) => {
+        const { [id]: _removed, ...rest } = r
+        return rest
+      })
+    },
+    []
+  )
+
+  // --- Folder comparison ----------------------------------------------------
+  const runCompare = useCallback(async () => {
+    if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
+    setView('folder')
+    setActiveNode(null)
+    const res = await run(active.leftRoot, active.rightRoot, active.options)
+    if (res) setResults((r) => ({ ...r, [active.id]: res }))
+  }, [active, run])
+
+  const refresh = useCallback(async () => {
+    if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
+    const res = await run(active.leftRoot, active.rightRoot, active.options)
+    if (res) setResults((r) => ({ ...r, [active.id]: res }))
+  }, [active, run])
 
   const swapSides = useCallback(() => {
-    setLeftRoot(rightRoot)
-    setRightRoot(leftRoot)
-    setLeftFile(rightFile)
-    setRightFile(leftFile)
-  }, [leftRoot, rightRoot, leftFile, rightFile])
+    updateActive({
+      leftRoot: active.rightRoot,
+      rightRoot: active.leftRoot,
+      leftFile: active.rightFile,
+      rightFile: active.leftFile,
+      leftText: active.rightText,
+      rightText: active.leftText
+    })
+  }, [active, updateActive])
 
   const openFile = useCallback((node: CompareNode) => {
     if (node.kind !== 'file') return
@@ -122,12 +180,8 @@ export default function App(): React.JSX.Element {
     setView('file')
   }, [])
 
-  // --- Next/prev changed-file navigation in the folder tree ----------------
+  // --- Next/prev changed-file navigation -----------------------------------
   const navList = useMemo(() => (result ? listChangedFiles(result.root) : []), [result])
-  useEffect(() => {
-    navPosRef.current = -1 // reset cursor on a fresh comparison
-  }, [result])
-
   const gotoChangedFile = useCallback(
     (dir: 1 | -1) => {
       if (navList.length === 0) return
@@ -139,19 +193,19 @@ export default function App(): React.JSX.Element {
     [navList]
   )
 
-  // --- Merge actions -------------------------------------------------------
+  // --- Merge actions --------------------------------------------------------
   const onCopy = useCallback(
     async (node: CompareNode, direction: Side) => {
       const srcPath = direction === 'left' ? node.left?.path : node.right?.path
       if (!srcPath) return
       const destPath =
-        direction === 'left' ? joinPath(rightRoot, node.relPath) : joinPath(leftRoot, node.relPath)
+        direction === 'left' ? joinPath(active.rightRoot, node.relPath) : joinPath(active.leftRoot, node.relPath)
       const arrow = direction === 'left' ? 'right' : 'left'
       if (!window.confirm(`Copy "${node.name}" to the ${arrow} side?\n\n${destPath}`)) return
       await window.api.copyEntry({ srcPath, destPath })
-      refresh()
+      void refresh()
     },
-    [leftRoot, rightRoot, refresh]
+    [active.leftRoot, active.rightRoot, refresh]
   )
 
   const onDelete = useCallback(
@@ -161,7 +215,7 @@ export default function App(): React.JSX.Element {
       const verb = useTrash ? 'Send to Recycle Bin' : 'Permanently delete'
       if (!window.confirm(`${verb} the ${side} "${node.name}"?\n\n${target}`)) return
       await window.api.deleteEntry({ path: target, toTrash: useTrash })
-      refresh()
+      void refresh()
     },
     [refresh, useTrash]
   )
@@ -178,17 +232,17 @@ export default function App(): React.JSX.Element {
       )
         return
       await window.api.makeMatch({ result, direction, toTrash: useTrash })
-      refresh()
+      void refresh()
     },
     [result, refresh, useTrash]
   )
 
-  // --- Menu actions (from the native application menu) ---------------------
+  // --- Menu actions ---------------------------------------------------------
   useEffect(() => {
     return window.api.onMenuAction((action) => {
       switch (action) {
         case 'compare':
-          runCompare()
+          void runCompare()
           break
         case 'cancel':
           cancel()
@@ -215,12 +269,12 @@ export default function App(): React.JSX.Element {
     })
   }, [runCompare, cancel, gotoChangedFile, swapSides])
 
-  // --- In-editor keyboard shortcuts (F4/F5 are owned by the menu) ----------
+  // --- In-editor keyboard shortcuts (F4/F5 owned by the menu) --------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'F6') {
         e.preventDefault()
-        if (view === 'file' || mode === 'files')
+        if (view === 'file' || active.type === 'files' || active.type === 'text')
           (e.shiftKey ? navRef.current?.prev : navRef.current?.next)?.()
       } else if (e.key === 'Escape' && view === 'file') {
         e.preventDefault()
@@ -229,41 +283,79 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, mode])
+  }, [view, active.type])
+
+  const directNode = useMemo<CompareNode | null>(() => {
+    if (active.type !== 'files') return null
+    if (!active.leftFile && !active.rightFile) return null
+    return {
+      name: basename(active.leftFile || active.rightFile),
+      relPath: basename(active.leftFile || active.rightFile),
+      kind: 'file',
+      status: 'different',
+      left: active.leftFile ? { path: active.leftFile, size: 0, mtimeMs: 0 } : undefined,
+      right: active.rightFile ? { path: active.rightFile, size: 0, mtimeMs: 0 } : undefined
+    }
+  }, [active.type, active.leftFile, active.rightFile])
 
   return (
     <div className="app">
       <div className="tab-bar">
-        <button
-          className={`tab${mode === 'folders' ? ' active' : ''}`}
-          onClick={() => setMode('folders')}
-        >
-          📁 Folder Compare
-        </button>
-        <button
-          className={`tab${mode === 'files' ? ' active' : ''}`}
-          onClick={() => setMode('files')}
-        >
-          📄 File Compare
-        </button>
+        {sessions.map((s) => (
+          <div
+            key={s.id}
+            className={`tab${s.id === activeId ? ' active' : ''}`}
+            onClick={() => setActiveId(s.id)}
+            title={sessionTitle(s)}
+          >
+            <span className="tab-icon">{SESSION_ICON[s.type]}</span>
+            <span className="tab-title">{sessionTitle(s)}</span>
+            <span
+              className="tab-close"
+              title="Close session"
+              onClick={(e) => {
+                e.stopPropagation()
+                closeSession(s.id)
+              }}
+            >
+              ×
+            </span>
+          </div>
+        ))}
+
+        <div className="new-session" ref={newSessionRef}>
+          <button className="tab-new" onClick={() => setShowNew((v) => !v)} title="New session">
+            +
+          </button>
+          {showNew && (
+            <div className="new-menu">
+              {(['folders', 'files', 'text'] as SessionType[]).map((t) => (
+                <button key={t} onClick={() => addSession(t)}>
+                  {SESSION_ICON[t]} {SESSION_LABEL[t]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         <span className="tab-spacer" />
         <button className="theme-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
           {theme === 'dark' ? '☀' : '☾'}
         </button>
       </div>
 
-      {mode === 'folders' ? (
+      {active.type === 'folders' && (
         <>
           <Toolbar
-            leftRoot={leftRoot}
-            rightRoot={rightRoot}
-            options={options}
+            leftRoot={active.leftRoot}
+            rightRoot={active.rightRoot}
+            options={active.options}
             comparing={comparing}
             theme={theme}
-            onLeftRoot={setLeftRoot}
-            onRightRoot={setRightRoot}
-            onOptions={setOptions}
-            onCompare={runCompare}
+            onLeftRoot={(p) => updateActive({ leftRoot: p })}
+            onRightRoot={(p) => updateActive({ rightRoot: p })}
+            onOptions={(o) => updateActive({ options: o })}
+            onCompare={() => void runCompare()}
             onCancel={cancel}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
           />
@@ -278,28 +370,23 @@ export default function App(): React.JSX.Element {
               </button>
               <span className="nav-count">{navList.length} changed</span>
               <span className="mb-sep" />
-              <button onClick={() => makeMatch('left')} disabled={!result}>
-                ⇒ Make right match left
-              </button>
-              <button onClick={() => makeMatch('right')} disabled={!result}>
-                ⇐ Make left match right
-              </button>
+              <button onClick={() => makeMatch('left')}>⇒ Make right match left</button>
+              <button onClick={() => makeMatch('right')}>⇐ Make left match right</button>
               <span className="hint">F4 next diff · F5 re-compare · double-click a file to diff</span>
             </div>
           )}
 
           <div className="app-body">
             {error && <div className="banner error">Comparison failed: {error}</div>}
-
             {!result && !comparing && (
               <div className="empty-state">
                 <h2>Folder Compare</h2>
                 <p>Pick two folders above (or drag them in) and press Compare.</p>
               </div>
             )}
-
             {result && view === 'folder' && (
               <TwoPaneTree
+                key={active.id}
                 result={result}
                 hideIdentical={hideIdentical}
                 selectedRelPath={selectedRelPath}
@@ -310,14 +397,13 @@ export default function App(): React.JSX.Element {
                 onDelete={onDelete}
               />
             )}
-
             {view === 'file' && activeNode && (
               <FileCompare
                 node={activeNode}
                 theme={theme}
-                ignoreWhitespace={options.filters.ignoreWhitespace}
+                ignoreWhitespace={active.options.filters.ignoreWhitespace}
                 onClose={() => setView('folder')}
-                onSaved={refresh}
+                onSaved={() => void refresh()}
                 registerNav={(nav) => {
                   navRef.current = nav
                 }}
@@ -325,26 +411,24 @@ export default function App(): React.JSX.Element {
             )}
           </div>
         </>
-      ) : (
+      )}
+
+      {active.type === 'files' && (
         <>
           <div className="toolbar">
             <div className="toolbar-row pickers">
-              <FolderPicker label="Left" value={leftFile} onChange={setLeftFile} file />
-              <FolderPicker label="Right" value={rightFile} onChange={setRightFile} file />
+              <FolderPicker label="Left" value={active.leftFile} onChange={(p) => updateActive({ leftFile: p })} file />
+              <FolderPicker label="Right" value={active.rightFile} onChange={(p) => updateActive({ rightFile: p })} file />
             </div>
           </div>
-
           <div className="app-body">
             {directNode ? (
               <FileCompare
-                key={`${leftFile}|${rightFile}`}
+                key={`${active.id}:${active.leftFile}|${active.rightFile}`}
                 node={directNode}
                 theme={theme}
-                ignoreWhitespace={options.filters.ignoreWhitespace}
-                onClose={() => {
-                  setLeftFile('')
-                  setRightFile('')
-                }}
+                ignoreWhitespace={false}
+                onClose={() => updateActive({ leftFile: '', rightFile: '' })}
                 registerNav={(nav) => {
                   navRef.current = nav
                 }}
@@ -357,6 +441,22 @@ export default function App(): React.JSX.Element {
             )}
           </div>
         </>
+      )}
+
+      {active.type === 'text' && (
+        <div className="app-body">
+          <TextCompare
+            key={active.id}
+            theme={theme}
+            ignoreWhitespace={false}
+            initialLeft={active.leftText}
+            initialRight={active.rightText}
+            onChange={(l, r) => updateSession(active.id, { leftText: l, rightText: r })}
+            registerNav={(nav) => {
+              navRef.current = nav
+            }}
+          />
+        </div>
       )}
 
       <StatusBar

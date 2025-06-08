@@ -4,6 +4,7 @@ import {
   type CompareOptions,
   type FilterOptions
 } from './types'
+import { createSession, type Session, type SessionType } from './session'
 
 export interface WindowBounds {
   x: number
@@ -13,35 +14,38 @@ export interface WindowBounds {
 }
 
 export interface PersistedSettings {
-  leftRoot: string
-  rightRoot: string
-  leftFile: string
-  rightFile: string
-  options: CompareOptions
+  sessions: Session[]
+  activeSessionId: string
   theme: 'light' | 'dark'
-  mode: 'folders' | 'files'
   hideIdentical: boolean
   useTrash: boolean
   windowBounds: WindowBounds | null
 }
 
-export const DEFAULT_SETTINGS: PersistedSettings = {
-  leftRoot: '',
-  rightRoot: '',
-  leftFile: '',
-  rightFile: '',
-  options: DEFAULT_OPTIONS,
-  theme: 'dark',
-  mode: 'folders',
-  hideIdentical: false,
-  useTrash: true,
-  windowBounds: null
+export function defaultSettings(): PersistedSettings {
+  const first = createSession('folders', 'session-0')
+  return {
+    sessions: [first],
+    activeSessionId: first.id,
+    theme: 'dark',
+    hideIdentical: false,
+    useTrash: true,
+    windowBounds: null
+  }
 }
 
+/** Kept for tests / convenience; always read a fresh copy via defaultSettings(). */
+export const DEFAULT_SETTINGS = defaultSettings()
+
 const METHODS: CompareMethod[] = ['content', 'sizeAndTime', 'quick']
+const TYPES: SessionType[] = ['folders', 'files', 'text']
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
+}
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : ''
 }
 
 function stringArray(v: unknown, fallback: string[]): string[] {
@@ -69,29 +73,62 @@ function coerceOptions(raw: unknown): CompareOptions {
   return { method, filters: coerceFilters(raw.filters) }
 }
 
+function coerceSession(raw: unknown): Session | null {
+  if (!isObject(raw)) return null
+  const type = raw.type
+  if (!TYPES.includes(type as SessionType)) return null
+  return {
+    id: str(raw.id),
+    type: type as SessionType,
+    leftRoot: str(raw.leftRoot),
+    rightRoot: str(raw.rightRoot),
+    options: coerceOptions(raw.options),
+    leftFile: str(raw.leftFile),
+    rightFile: str(raw.rightFile),
+    leftText: str(raw.leftText),
+    rightText: str(raw.rightText)
+  }
+}
+
 function coerceBounds(raw: unknown): WindowBounds | null {
   if (!isObject(raw)) return null
   const { x, y, width, height } = raw
-  if ([x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n)) && (width as number) > 0 && (height as number) > 0) {
+  if (
+    [x, y, width, height].every((n) => typeof n === 'number' && Number.isFinite(n)) &&
+    (width as number) > 0 &&
+    (height as number) > 0
+  ) {
     return { x: x as number, y: y as number, width: width as number, height: height as number }
   }
   return null
 }
 
 /**
- * Build a fully-valid settings object from arbitrary parsed JSON, falling back
- * to defaults for any missing or malformed field. Never throws.
+ * Build fully-valid settings from arbitrary parsed JSON, falling back to
+ * defaults for anything missing or malformed. Ensures at least one session
+ * with unique ids and a valid active id. Never throws.
  */
 export function coerceSettings(raw: unknown): PersistedSettings {
-  if (!isObject(raw)) return { ...DEFAULT_SETTINGS, options: { ...DEFAULT_OPTIONS } }
-  const s: PersistedSettings = { ...DEFAULT_SETTINGS }
-  if (typeof raw.leftRoot === 'string') s.leftRoot = raw.leftRoot
-  if (typeof raw.rightRoot === 'string') s.rightRoot = raw.rightRoot
-  if (typeof raw.leftFile === 'string') s.leftFile = raw.leftFile
-  if (typeof raw.rightFile === 'string') s.rightFile = raw.rightFile
-  s.options = coerceOptions(raw.options)
+  const s = defaultSettings()
+  if (!isObject(raw)) return s
+
+  if (Array.isArray(raw.sessions)) {
+    const list = raw.sessions.map(coerceSession).filter((x): x is Session => x !== null)
+    if (list.length > 0) {
+      const seen = new Set<string>()
+      list.forEach((sess, i) => {
+        if (!sess.id || seen.has(sess.id)) sess.id = `session-${i}`
+        seen.add(sess.id)
+      })
+      s.sessions = list
+      s.activeSessionId = list[0].id
+    }
+  }
+
+  if (typeof raw.activeSessionId === 'string' && s.sessions.some((x) => x.id === raw.activeSessionId)) {
+    s.activeSessionId = raw.activeSessionId
+  }
   if (raw.theme === 'light' || raw.theme === 'dark') s.theme = raw.theme
-  if (raw.mode === 'folders' || raw.mode === 'files') s.mode = raw.mode
   if (typeof raw.hideIdentical === 'boolean') s.hideIdentical = raw.hideIdentical
   if (typeof raw.useTrash === 'boolean') s.useTrash = raw.useTrash
   s.windowBounds = coerceBounds(raw.windowBounds)

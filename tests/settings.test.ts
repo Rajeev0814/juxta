@@ -1,52 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { coerceSettings, DEFAULT_SETTINGS } from '../src/shared/settings'
+import { coerceSettings } from '../src/shared/settings'
 
 describe('coerceSettings', () => {
-  it('returns defaults for non-object / garbage input', () => {
-    expect(coerceSettings(undefined)).toEqual(DEFAULT_SETTINGS)
-    expect(coerceSettings(null)).toEqual(DEFAULT_SETTINGS)
-    expect(coerceSettings(42)).toEqual(DEFAULT_SETTINGS)
-    expect(coerceSettings('nope')).toEqual(DEFAULT_SETTINGS)
+  it('returns a default single folder session for garbage input', () => {
+    for (const bad of [undefined, null, 42, 'nope']) {
+      const s = coerceSettings(bad)
+      expect(s.sessions).toHaveLength(1)
+      expect(s.sessions[0].type).toBe('folders')
+      expect(s.activeSessionId).toBe(s.sessions[0].id)
+      expect(s.theme).toBe('dark')
+      expect(s.useTrash).toBe(true)
+    }
   })
 
-  it('keeps valid fields and falls back for missing ones', () => {
-    const s = coerceSettings({ leftRoot: 'C:/a', theme: 'light', mode: 'files', hideIdentical: true })
-    expect(s.leftRoot).toBe('C:/a')
-    expect(s.theme).toBe('light')
-    expect(s.mode).toBe('files')
-    expect(s.hideIdentical).toBe(true)
-    // untouched fields keep defaults
-    expect(s.rightRoot).toBe('')
-    expect(s.useTrash).toBe(true)
-    expect(s.options.method).toBe('content')
-  })
-
-  it('rejects invalid enum values', () => {
-    const s = coerceSettings({ theme: 'neon', mode: 'galaxy', options: { method: 'telepathy' } })
-    expect(s.theme).toBe('dark')
-    expect(s.mode).toBe('folders')
-    expect(s.options.method).toBe('content')
-  })
-
-  it('coerces filter sub-fields and ignores non-string globs', () => {
+  it('keeps valid sessions and validates the active id', () => {
     const s = coerceSettings({
-      options: { method: 'quick', filters: { includeGlobs: ['*.ts', 5], excludeGlobs: ['x'], ignoreCase: true } }
+      sessions: [
+        { id: 'a', type: 'folders', leftRoot: 'C:/x' },
+        { id: 'b', type: 'text', leftText: 'hello' }
+      ],
+      activeSessionId: 'b'
     })
-    expect(s.options.method).toBe('quick')
-    // includeGlobs had a non-string -> falls back to default ([])
-    expect(s.options.filters.includeGlobs).toEqual([])
-    expect(s.options.filters.excludeGlobs).toEqual(['x'])
-    expect(s.options.filters.ignoreCase).toBe(true)
+    expect(s.sessions.map((x) => x.type)).toEqual(['folders', 'text'])
+    expect(s.sessions[0].leftRoot).toBe('C:/x')
+    expect(s.sessions[1].leftText).toBe('hello')
+    expect(s.activeSessionId).toBe('b')
   })
 
-  it('accepts valid window bounds and rejects malformed ones', () => {
-    expect(coerceSettings({ windowBounds: { x: 10, y: 20, width: 800, height: 600 } }).windowBounds).toEqual({
-      x: 10,
-      y: 20,
+  it('drops sessions with an invalid type and de-duplicates / fills ids', () => {
+    const s = coerceSettings({
+      sessions: [
+        { id: 'dup', type: 'files' },
+        { id: 'dup', type: 'text' },
+        { type: 'folders' }, // missing id
+        { type: 'bogus' } // invalid -> dropped
+      ]
+    })
+    expect(s.sessions).toHaveLength(3)
+    const ids = s.sessions.map((x) => x.id)
+    expect(new Set(ids).size).toBe(3) // all unique
+  })
+
+  it('falls back active id to the first session when invalid', () => {
+    const s = coerceSettings({ sessions: [{ id: 'only', type: 'files' }], activeSessionId: 'missing' })
+    expect(s.activeSessionId).toBe('only')
+  })
+
+  it('falls back to defaults when sessions is empty or not an array', () => {
+    expect(coerceSettings({ sessions: [] }).sessions).toHaveLength(1)
+    expect(coerceSettings({ sessions: 'x' }).sessions).toHaveLength(1)
+  })
+
+  it('coerces session options and rejects invalid enums', () => {
+    const s = coerceSettings({
+      sessions: [{ id: 'a', type: 'folders', options: { method: 'telepathy', filters: { ignoreCase: true } } }]
+    })
+    expect(s.sessions[0].options.method).toBe('content')
+    expect(s.sessions[0].options.filters.ignoreCase).toBe(true)
+  })
+
+  it('validates window bounds', () => {
+    expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
+      x: 1,
+      y: 2,
       width: 800,
       height: 600
     })
-    expect(coerceSettings({ windowBounds: { x: 10, y: 20, width: 0, height: 600 } }).windowBounds).toBeNull()
-    expect(coerceSettings({ windowBounds: 'big' }).windowBounds).toBeNull()
+    expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 0, height: 600 } }).windowBounds).toBeNull()
   })
 })

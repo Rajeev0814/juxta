@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode } from '../../../shared/types'
 import { applyBlock, changedBlockIndices, computeBlocks } from '../../../shared/blocks'
 import { languageForPath } from '../lib/language'
+import { juxtaTheme } from '../lib/monacoSetup'
 
 interface Props {
   node: CompareNode
@@ -27,6 +28,9 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
   const [leftDirty, setLeftDirty] = useState(false)
   const [rightDirty, setRightDirty] = useState(false)
   const [current, setCurrent] = useState(0) // index into the changed-block list
+  // Inline (unified) view also enables wrapping; side-by-side never wraps
+  // (Monaco can't wrap the left/original pane, only the right).
+  const [inline, setInline] = useState(false)
 
   const editorRef = useRef<MonacoDiffEditor | null>(null)
 
@@ -172,6 +176,10 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
             Save R
           </button>
           <span className="fc-sep" />
+          <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
+            {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}
+          </button>
+          <span className="fc-sep" />
           <button onClick={onClose} title="Back (Esc)">
             ✕ Close
           </button>
@@ -189,20 +197,21 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
             original={leftText ?? ''}
             modified={rightText ?? ''}
             language={language}
-            theme={theme === 'dark' ? 'vs-dark' : 'vs'}
+            theme={juxtaTheme(theme)}
             onMount={onMount}
             keepCurrentOriginalModel={false}
             keepCurrentModifiedModel={false}
             options={{
               readOnly: true,
               originalEditable: false,
-              renderSideBySide: true,
+              renderSideBySide: !inline,
               ignoreTrimWhitespace: ignoreWhitespace,
               renderOverviewRuler: true,
               automaticLayout: true,
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
-              fontSize: 12
+              fontSize: 12,
+              diffWordWrap: inline ? 'on' : 'off'
             }}
           />
         )}
