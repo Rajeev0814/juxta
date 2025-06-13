@@ -302,6 +302,12 @@
   color: var(--accent);
   font-weight: 600;
 }
+.moved {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 4px;
+  flex: none;
+}
 
 /* status coloring (applied to the row, tinting both panes) */
 .tree-row.st-different .pane-cell:not(.absent) {
@@ -373,6 +379,12 @@
   white-space: nowrap;
   min-width: 0;
 }
+.fc-enc {
+  color: var(--text-dim);
+  font-size: 11px;
+  font-family: var(--mono);
+  margin-left: 8px;
+}
 /* Let the action buttons participate directly in the bar's flex-wrap so they
    wrap to a new row instead of overflowing off-screen on narrow windows. */
 .fc-actions {
@@ -390,6 +402,16 @@
   align-self: stretch;
   background: var(--border);
   margin: 2px 2px;
+}
+.fc-stats {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+.fc-stats .add {
+  color: var(--st-left-only);
+}
+.fc-stats .del {
+  color: var(--st-right-only);
 }
 .file-compare-body {
   flex: 1;
@@ -440,6 +462,9 @@
 }
 .c-identical {
   color: var(--st-identical);
+}
+.c-moved {
+  color: var(--accent);
 }
 .sb-progress {
   font-family: var(--mono);

@@ -5,6 +5,7 @@ import type {
   CompareSummary,
   DiffStatus,
   EntryKind,
+  MovePair,
   Newer,
   SideInfo
 } from '../shared/types'
@@ -13,6 +14,7 @@ import { join } from 'node:path'
 import { createWalkMatcher } from './filters'
 import { hashFile } from './hash'
 import { createIgnoreMatcher, type IgnoreMatcher } from './ignore'
+import type { HashCache } from './hashCache'
 import { walkTree, type WalkEntry } from './walk'
 
 export interface ProgressSink {
@@ -26,6 +28,25 @@ export interface ProgressSink {
 
 /** mtime tolerance in ms — FAT/exFAT volumes have ~2s timestamp resolution. */
 const MTIME_TOLERANCE_MS = 2000
+
+/** Hash a file, consulting/updating the persistent cache when provided. */
+async function cachedHash(
+  entry: WalkEntry,
+  options: CompareOptions,
+  cache: HashCache | undefined
+): Promise<string | undefined> {
+  const ws = options.filters.ignoreWhitespace
+  const ic = options.filters.ignoreCase
+  const hit = cache?.get(entry.path, entry.size, entry.mtimeMs, ws, ic)
+  if (hit !== undefined) return hit
+  try {
+    const hash = await hashFile(entry.path, { ignoreWhitespace: ws, ignoreCase: ic })
+    cache?.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
+    return hash
+  } catch {
+    return undefined
+  }
+}
 
 /** Read a root's .gitignore (if any) and compile it into a matcher. */
 async function loadGitignore(root: string): Promise<IgnoreMatcher | undefined> {
@@ -112,6 +133,8 @@ export interface CompareEngineInput {
   rightRoot: string
   options: CompareOptions
   onProgress?: ProgressSink
+  /** Optional persistent hash cache to skip re-hashing unchanged files. */
+  cache?: HashCache
   /** Injectable clock for deterministic tests. */
   now?: () => number
 }
@@ -187,14 +210,7 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
     const total = toHash.length
     let processed = 0
     await mapPool(toHash, 8, async (entry) => {
-      try {
-        entry.hash = await hashFile(entry.path, {
-          ignoreWhitespace: options.filters.ignoreWhitespace,
-          ignoreCase: options.filters.ignoreCase
-        })
-      } catch {
-        entry.hash = undefined // unreadable — comparison falls back to size
-      }
+      entry.hash = await cachedHash(entry, options, input.cache)
       onProgress?.({ phase: 'hashing', processed: ++processed, total, currentPath: entry.path })
     })
   }
@@ -206,8 +222,10 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
     different: 0,
     leftOnly: 0,
     rightOnly: 0,
+    moved: 0,
     totalFiles: 0
   }
+  const fileNodeIndex = new Map<string, CompareNode>()
 
   function buildNode(key: string): CompareNode {
     const m = merged.get(key)!
@@ -219,6 +237,8 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
       left: m.left ? toSideInfo(m.left) : undefined,
       right: m.right ? toSideInfo(m.right) : undefined
     }
+
+    if (m.kind === 'file') fileNodeIndex.set(m.relPath, base)
 
     if (m.kind === 'directory') {
       const childKeys = childrenOf.get(key) ?? []
@@ -270,6 +290,12 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
     children: rootChildren
   }
 
+  // --- Phase 5: detect renamed/moved files (content comparisons only) ------
+  const moves =
+    options.method === 'content'
+      ? await detectMoves(merged, fileNodeIndex, summary, options, input.cache)
+      : []
+
   onProgress?.({ phase: 'done', processed: merged.size, total: merged.size })
 
   return {
@@ -278,6 +304,56 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
     options,
     root,
     summary,
+    moves,
     elapsedMs: clock() - startedAt
   }
+}
+
+/**
+ * Pair left-only and right-only files that have identical content (same hash)
+ * as renames/moves. Annotates the corresponding nodes and updates the summary.
+ */
+async function detectMoves(
+  merged: Map<string, MergedEntry>,
+  fileNodeIndex: Map<string, CompareNode>,
+  summary: CompareSummary,
+  options: CompareOptions,
+  cache: HashCache | undefined
+): Promise<MovePair[]> {
+  const leftOrphans: WalkEntry[] = []
+  const rightOrphans: WalkEntry[] = []
+  for (const m of merged.values()) {
+    if (m.kind !== 'file') continue
+    if (m.left && !m.right) leftOrphans.push(m.left)
+    else if (m.right && !m.left) rightOrphans.push(m.right)
+  }
+  if (leftOrphans.length === 0 || rightOrphans.length === 0) return []
+
+  await mapPool([...leftOrphans, ...rightOrphans], 8, async (entry) => {
+    if (entry.hash === undefined) entry.hash = await cachedHash(entry, options, cache)
+  })
+
+  // Map right-orphan hash -> queue of relPaths (handle duplicate-content files).
+  const rightByHash = new Map<string, string[]>()
+  for (const r of rightOrphans) {
+    if (r.hash === undefined) continue
+    const list = rightByHash.get(r.hash)
+    if (list) list.push(r.relPath)
+    else rightByHash.set(r.hash, [r.relPath])
+  }
+
+  const moves: MovePair[] = []
+  for (const l of leftOrphans) {
+    if (l.hash === undefined) continue
+    const candidates = rightByHash.get(l.hash)
+    if (!candidates || candidates.length === 0) continue
+    const toRel = candidates.shift()!
+    moves.push({ from: l.relPath, to: toRel })
+    summary.moved++
+    const fromNode = fileNodeIndex.get(l.relPath)
+    const toNode = fileNodeIndex.get(toRel)
+    if (fromNode) fromNode.movedTo = toRel
+    if (toNode) toNode.movedFrom = l.relPath
+  }
+  return moves
 }

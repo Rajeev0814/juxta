@@ -26,7 +26,8 @@ const fakeResult = (): CompareResult => ({
   rightRoot: 'r',
   options: DEFAULT_OPTIONS,
   root: { name: '', relPath: '', kind: 'directory', status: 'identical', children: [] },
-  summary: { identical: 0, different: 0, leftOnly: 0, rightOnly: 0, totalFiles: 0 },
+  summary: { identical: 0, different: 0, leftOnly: 0, rightOnly: 0, moved: 0, totalFiles: 0 },
+  moves: [],
   elapsedMs: 1
 })
 

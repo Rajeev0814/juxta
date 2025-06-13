@@ -10,6 +10,7 @@ export const IPC = {
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
+  writeClipboard: 'clipboard:write',
   copyEntry: 'merge:copyEntry',
   deleteEntry: 'merge:deleteEntry',
   makeMatch: 'merge:makeMatch',
@@ -52,6 +53,10 @@ export interface FileContents {
   binary: boolean
   /** True when the file was too large to load into the editor. */
   tooLarge: boolean
+  /** Detected text encoding label (e.g. "UTF-8", "UTF-16 LE"). */
+  encoding: string
+  /** Detected line-ending label (e.g. "LF", "CRLF", "Mixed"). */
+  eol: string
 }
 
 // The API surface exposed to the renderer via contextBridge.
@@ -63,6 +68,7 @@ export interface RendererApi {
   onProgress(cb: (update: ProgressUpdate) => void): () => void
   readFile(path: string): Promise<FileContents>
   writeFile(path: string, text: string): Promise<void>
+  writeClipboard(text: string): Promise<void>
   copyEntry(req: CopyRequest): Promise<void>
   deleteEntry(req: DeleteRequest): Promise<void>
   makeMatch(req: MakeMatchRequest): Promise<void>

@@ -1,5 +1,8 @@
+import { stat } from 'node:fs/promises'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { compareFolders } from '../src/core/compare'
+import { HashCache } from '../src/core/hashCache'
 import { DEFAULT_FILTERS, type CompareOptions } from '../src/shared/types'
 import { indexNodes, makeTree } from './helpers'
 
@@ -102,6 +105,68 @@ describe('compareFolders — quick and size+time methods', () => {
     const node = indexNodes(res.root).get('f.txt')!
     expect(node.status).toBe('different')
     expect(node.newer).toBe('right')
+  })
+})
+
+describe('compareFolders — hash cache', () => {
+  it('uses a cached hash (seeding a bogus hash makes identical files appear different)', async () => {
+    const left = await makeTree({ 'x.txt': 'same' })
+    const right = await makeTree({ 'x.txt': 'same' })
+    const cache = new HashCache()
+    const leftFile = join(left, 'x.txt')
+    const st = await stat(leftFile)
+    cache.set(leftFile, st.size, st.mtimeMs, false, false, 'BOGUS-DIFFERENT-HASH')
+
+    const res = await compareFolders({ leftRoot: left, rightRoot: right, options: opts(), cache })
+    // Left reads the (wrong) cached hash; right computes the real one -> differ.
+    expect(indexNodes(res.root).get('x.txt')!.status).toBe('different')
+  })
+
+  it('populates the cache during a comparison', async () => {
+    const left = await makeTree({ 'y.txt': 'data' })
+    const right = await makeTree({ 'y.txt': 'data' })
+    const cache = new HashCache()
+    await compareFolders({ leftRoot: left, rightRoot: right, options: opts(), cache })
+    expect(cache.size).toBeGreaterThan(0)
+  })
+})
+
+describe('compareFolders — moved/renamed detection', () => {
+  it('pairs identical-content orphans as moves and annotates the nodes', async () => {
+    const left = await makeTree({
+      'old-name.txt': 'unique movable content',
+      'sub/keep.txt': 'k'
+    })
+    const right = await makeTree({
+      'renamed.txt': 'unique movable content',
+      'sub/keep.txt': 'k'
+    })
+    const res = await compareFolders({ leftRoot: left, rightRoot: right, options: opts() })
+    const nodes = indexNodes(res.root)
+
+    expect(res.summary.moved).toBe(1)
+    expect(res.moves).toEqual([{ from: 'old-name.txt', to: 'renamed.txt' }])
+    expect(nodes.get('old-name.txt')!.movedTo).toBe('renamed.txt')
+    expect(nodes.get('renamed.txt')!.movedFrom).toBe('old-name.txt')
+  })
+
+  it('does not pair orphans with different content', async () => {
+    const left = await makeTree({ 'a.txt': 'aaa' })
+    const right = await makeTree({ 'b.txt': 'bbb' })
+    const res = await compareFolders({ leftRoot: left, rightRoot: right, options: opts() })
+    expect(res.summary.moved).toBe(0)
+    expect(res.moves).toEqual([])
+  })
+
+  it('reports no moves for non-content comparison methods', async () => {
+    const left = await makeTree({ 'old.txt': 'same size!' })
+    const right = await makeTree({ 'new.txt': 'same size!' })
+    const res = await compareFolders({
+      leftRoot: left,
+      rightRoot: right,
+      options: opts({ method: 'quick' })
+    })
+    expect(res.moves).toEqual([])
   })
 })
 

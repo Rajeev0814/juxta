@@ -58,6 +58,99 @@ export function toLines(text: string): string[] {
   return text.split('\n')
 }
 
+export interface DiffStats {
+  added: number
+  removed: number
+}
+
+/** Count added (right-only) and removed (left-only) lines between two texts. */
+export function diffStats(oldText: string, newText: string): DiffStats {
+  const ops = lcsDiff(toLines(oldText), toLines(newText))
+  let added = 0
+  let removed = 0
+  for (const op of ops) {
+    if (op.t === 'add') added++
+    else if (op.t === 'del') removed++
+  }
+  return { added, removed }
+}
+
+export interface UnifiedDiffOptions {
+  oldPath?: string
+  newPath?: string
+  /** Number of unchanged context lines around each change (default 3). */
+  context?: number
+}
+
+interface DiffEntry {
+  type: 'eq' | 'del' | 'add'
+  text: string
+  a: number // 1-based old line number
+  b: number // 1-based new line number
+}
+
+/**
+ * Produce a standard unified diff (the `--- / +++ / @@` patch format) for two
+ * texts. Returns '' when the texts are identical. Pure and reused from the LCS.
+ */
+export function toUnifiedDiff(oldText: string, newText: string, options: UnifiedDiffOptions = {}): string {
+  const context = options.context ?? 3
+  const oldPath = options.oldPath ?? 'a'
+  const newPath = options.newPath ?? 'b'
+  const ops = lcsDiff(toLines(oldText), toLines(newText))
+
+  // Annotate each op with old/new line numbers.
+  const entries: DiffEntry[] = []
+  let a = 0
+  let b = 0
+  for (const op of ops) {
+    if (op.t === 'eq') {
+      a++
+      b++
+      entries.push({ type: 'eq', text: op.s, a, b })
+    } else if (op.t === 'del') {
+      a++
+      entries.push({ type: 'del', text: op.s, a, b })
+    } else {
+      b++
+      entries.push({ type: 'add', text: op.s, a, b })
+    }
+  }
+
+  const changeIdx = entries.flatMap((e, i) => (e.type === 'eq' ? [] : [i]))
+  if (changeIdx.length === 0) return ''
+
+  // Merge nearby changes (within context) into hunks.
+  const hunks: Array<{ start: number; end: number }> = []
+  let i = 0
+  while (i < changeIdx.length) {
+    let start = Math.max(0, changeIdx[i] - context)
+    let end = Math.min(entries.length - 1, changeIdx[i] + context)
+    let j = i + 1
+    while (j < changeIdx.length && changeIdx[j] - context <= end + 1) {
+      end = Math.min(entries.length - 1, changeIdx[j] + context)
+      j++
+    }
+    hunks.push({ start, end })
+    i = j
+  }
+
+  const lines: string[] = [`--- ${oldPath}`, `+++ ${newPath}`]
+  for (const { start, end } of hunks) {
+    const slice = entries.slice(start, end + 1)
+    const oldLines = slice.filter((e) => e.type !== 'add')
+    const newLines = slice.filter((e) => e.type !== 'del')
+    const oldStart = oldLines.length ? oldLines[0].a : slice[0].a
+    const newStart = newLines.length ? newLines[0].b : slice[0].b
+    lines.push(`@@ -${oldStart},${oldLines.length} +${newStart},${newLines.length} @@`)
+    for (const e of slice) {
+      const prefix = e.type === 'eq' ? ' ' : e.type === 'del' ? '-' : '+'
+      lines.push(prefix + e.text)
+    }
+  }
+  return lines.join('\n') + '\n'
+}
+
 /** Align two texts into a sequence of equal / changed blocks. */
 export function computeBlocks(leftText: string, rightText: string): MergeBlock[] {
   const a = toLines(leftText)

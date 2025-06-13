@@ -1,7 +1,14 @@
 import { DiffEditor, type MonacoDiffEditor } from '@monaco-editor/react'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { editor as MonacoEditorNS } from 'monaco-editor'
-import { applyBlock, blockAtRightLine, changedBlockIndices, computeBlocks } from '../../../shared/blocks'
+import {
+  applyBlock,
+  blockAtRightLine,
+  changedBlockIndices,
+  computeBlocks,
+  diffStats,
+  toUnifiedDiff
+} from '../../../shared/blocks'
 import { juxtaTheme } from '../lib/monacoSetup'
 
 interface Props {
@@ -39,10 +46,12 @@ export function TextCompare({
   const editorRef = useRef<MonacoDiffEditor | null>(null)
   const diffIndex = useRef(0)
   const [count, setCount] = useState(0)
+  const [stats, setStats] = useState({ added: 0, removed: 0 })
   // Inline (unified) view also enables wrapping; side-by-side never wraps,
   // because Monaco's diff cannot wrap the left/original pane (only the right),
   // so wrapping side-by-side would be asymmetric.
   const [inline, setInline] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const gotoDiff = useCallback((dir: 1 | -1): void => {
     const editor = editorRef.current
@@ -71,7 +80,10 @@ export function TextCompare({
     // Seed the panes from the session's saved text.
     if (initialLeft) original.getModel()?.setValue(initialLeft)
     if (initialRight) modified.getModel()?.setValue(initialRight)
-    const update = (): void => setCount((editor.getLineChanges() ?? []).length)
+    const update = (): void => {
+      setCount((editor.getLineChanges() ?? []).length)
+      setStats(diffStats(original.getModel()?.getValue() ?? '', modified.getModel()?.getValue() ?? ''))
+    }
     editor.onDidUpdateDiff(update)
     // Persist edits back to the owning session.
     const persist = (): void =>
@@ -113,6 +125,18 @@ export function TextCompare({
     setEditorText(right, lv)
   }, [])
 
+  const copyPatch = useCallback((): void => {
+    const editor = editorRef.current
+    if (!editor) return
+    const lt = editor.getOriginalEditor().getModel()?.getValue() ?? ''
+    const rt = editor.getModifiedEditor().getModel()?.getValue() ?? ''
+    const patch = toUnifiedDiff(lt, rt, { oldPath: 'left', newPath: 'right' })
+    if (!patch) return
+    void window.api.writeClipboard(patch)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [])
+
   const clear = useCallback((): void => {
     const editor = editorRef.current
     if (!editor) return
@@ -127,6 +151,11 @@ export function TextCompare({
         <span className="fc-hint">Paste or type into each side — the diff updates live</span>
         <div className="fc-actions">
           <span className="fc-count" title="Changed sections">{count}</span>
+          {(stats.added > 0 || stats.removed > 0) && (
+            <span className="fc-stats" title="Lines added / removed">
+              <span className="add">+{stats.added}</span> <span className="del">−{stats.removed}</span>
+            </span>
+          )}
           <button onClick={() => gotoDiff(-1)} disabled={count === 0} title="Previous difference (Shift+F6)">
             ↑
           </button>
@@ -143,6 +172,9 @@ export function TextCompare({
           <span className="fc-sep" />
           <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
             {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}
+          </button>
+          <button onClick={copyPatch} disabled={count === 0} title="Copy a unified diff (patch) to the clipboard">
+            {copied ? '✓ Copied' : '⎘ Patch'}
           </button>
           <button onClick={swap} title="Swap the two sides">
             ⇄ Swap

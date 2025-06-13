@@ -16,16 +16,16 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ⬜ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
 - ⬜ B2. 3-way merge (files + folders) with auto-merge
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
-- ⬜ B4. Moved / renamed detection (match by content hash)
+- ✅ B4. Moved / renamed detection (match by content hash)
 - ⬜ B5. Per-file-type rules / ignore comments via regex
-- ⬜ B6. Encoding & line-ending detection / conversion
-- ⬜ B7. Reports & patch (HTML report, unified-diff export/apply)
+- 🟦 B6. Encoding & line-ending — ✅ detect UTF-8/UTF-16 + EOL, fix UTF-16 decode; ⬜ conversion on save
+- 🟦 B7. Reports & patch — ✅ unified-diff "Copy patch"; ⬜ HTML report, apply-patch
 - ⬜ B8. Snapshots (capture + compare against)
 - ⬜ B9. Timestamp / attribute operations
 
 ## C. Specialized comparators
 - ⬜ C1. Image compare (side-by-side, overlay, swipe, pixel diff)
-- ⬜ C2. Hex / binary viewer
+- ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
 - ⬜ C3. Table compare (CSV/TSV with key-column alignment)
 - ⬜ C4. Structured data compare (JSON/YAML/XML aligned by key)
 - ⬜ C5. AST / semantic code diff
@@ -40,11 +40,11 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ⬜ D5. Plugin system
 
 ## E. Performance & robustness
-- ⬜ E1. Persistent hash cache (path+size+mtime keyed)
+- ✅ E1. Persistent hash cache (path+size+mtime+flags keyed)
 - ⬜ E2. File-watch / live re-compare
 - ⬜ E3. Streaming / byte-range compare for huge files
 
 ## F. Differentiators
-- ⬜ F1. Diff insights (added/removed/churn, heatmap)
+- 🟦 F1. Diff insights — ✅ +added/−removed line stats (file/text); ⬜ folder churn heatmap
 - ⬜ F2. Minimap / overview ruler with diff markers
 - ⬜ F3. Comparison profiles per project + settings sync

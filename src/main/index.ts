@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { readFile, stat, writeFile } from 'node:fs/promises'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
+import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
 import { buildMenuTemplate, type MenuActionId } from './menu'
 import {
   IPC,
@@ -11,6 +11,8 @@ import {
   type MakeMatchRequest
 } from '../shared/ipc'
 import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch } from '../core/merge'
+import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
+import { toHexDump } from '../core/hex'
 import { DEFAULT_SETTINGS, type PersistedSettings, type WindowBounds } from '../shared/settings'
 import { loadSettings, saveSettings } from './settings'
 import { CompareService } from './compareService'
@@ -18,6 +20,8 @@ import { CompareService } from './compareService'
 const isDev = !app.isPackaged
 /** Files above this size are not loaded into the diff editor. */
 const MAX_DIFF_FILE_BYTES = 20 * 1024 * 1024
+/** Max bytes rendered as a hex dump for binary files. */
+const MAX_HEX_BYTES = 256 * 1024
 
 let mainWindow: BrowserWindow | null = null
 let settings: PersistedSettings = DEFAULT_SETTINGS
@@ -35,6 +39,12 @@ function resolveBounds(saved: WindowBounds | null): WindowBounds {
 
 function createWindow(): void {
   const bounds = resolveBounds(settings.windowBounds)
+  // App exe icon editing is disabled for signing reasons, so set the window
+  // (taskbar) icon explicitly. In dev it lives under build/; when packaged it
+  // is copied to resources/ via electron-builder extraResources.
+  const iconPath = isDev
+    ? join(__dirname, '../../build/icon.png')
+    : join(process.resourcesPath, 'icon.png')
 
   mainWindow = new BrowserWindow({
     ...bounds,
@@ -43,6 +53,7 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#1e1e1e',
     title: 'Juxta',
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -114,22 +125,40 @@ function registerIpc(): void {
   ipcMain.handle(IPC.readFile, async (_e, path: string): Promise<FileContents> => {
     const info = await stat(path)
     if (info.size > MAX_DIFF_FILE_BYTES) {
-      return { path, text: '', binary: false, tooLarge: true }
+      return { path, text: '', binary: false, tooLarge: true, encoding: '', eol: '' }
     }
     const buf = await readFile(path)
-    // Heuristic: NUL byte in the first 8KB => treat as binary.
-    const sample = buf.subarray(0, 8192)
-    const binary = sample.includes(0)
+    const enc = detectEncoding(buf)
+    // Only UTF-8 needs the NUL-byte binary check; UTF-16 legitimately has NULs.
+    const binary = enc.encoding === 'utf8' && buf.subarray(0, 8192).includes(0)
+    if (binary) {
+      // Render a hex dump so binary files can still be viewed/compared.
+      return {
+        path,
+        text: toHexDump(buf, { maxBytes: MAX_HEX_BYTES }),
+        binary: true,
+        tooLarge: false,
+        encoding: 'Binary (hex)',
+        eol: ''
+      }
+    }
+    const text = decodeText(buf, enc)
     return {
       path,
-      text: binary ? '' : buf.toString('utf8'),
-      binary,
-      tooLarge: false
+      text,
+      binary: false,
+      tooLarge: false,
+      encoding: encodingLabel(enc.encoding),
+      eol: eolLabel(detectEol(text))
     }
   })
 
   ipcMain.handle(IPC.writeFile, async (_e, path: string, text: string) => {
     await writeFile(path, text, 'utf8')
+  })
+
+  ipcMain.handle(IPC.writeClipboard, async (_e, text: string) => {
+    clipboard.writeText(text)
   })
 
   ipcMain.handle(IPC.copyEntry, async (_e, req: CopyRequest) => {
@@ -160,6 +189,7 @@ function registerIpc(): void {
 
 app.whenReady().then(async () => {
   settings = await loadSettings()
+  compareService.cachePath = join(app.getPath('userData'), 'juxta-hashcache.json')
   nativeTheme.themeSource = settings.theme
   registerIpc()
   installMenu()
