@@ -56,6 +56,10 @@ export interface CompareNode {
   left?: SideInfo
   right?: SideInfo
   children?: CompareNode[]
+  /** For a left-only file detected as renamed/moved: the right-side relPath. */
+  movedTo?: string
+  /** For a right-only file detected as renamed/moved: the left-side relPath. */
+  movedFrom?: string
 }
 
 export interface CompareSummary {
@@ -63,8 +67,15 @@ export interface CompareSummary {
   different: number
   leftOnly: number
   rightOnly: number
+  /** Left-only/right-only pairs detected as the same file renamed/moved. */
+  moved: number
   /** Total files (not directories) examined. */
   totalFiles: number
+}
+
+export interface MovePair {
+  from: string // left-side relPath
+  to: string // right-side relPath
 }
 
 export interface CompareResult {
@@ -73,6 +84,8 @@ export interface CompareResult {
   options: CompareOptions
   root: CompareNode
   summary: CompareSummary
+  /** Renamed/moved file pairs (content comparisons only). */
+  moves: MovePair[]
   /** Milliseconds the comparison took. */
   elapsedMs: number
 }

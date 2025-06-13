@@ -22,6 +22,7 @@ const api: RendererApi = {
   },
   readFile: (path: string): Promise<FileContents> => ipcRenderer.invoke(IPC.readFile, path),
   writeFile: (path: string, text: string) => ipcRenderer.invoke(IPC.writeFile, path, text),
+  writeClipboard: (text: string) => ipcRenderer.invoke(IPC.writeClipboard, text),
   copyEntry: (req: CopyRequest) => ipcRenderer.invoke(IPC.copyEntry, req),
   deleteEntry: (req: DeleteRequest) => ipcRenderer.invoke(IPC.deleteEntry, req),
   makeMatch: (req: MakeMatchRequest) => ipcRenderer.invoke(IPC.makeMatch, req),

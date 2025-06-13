@@ -28,6 +28,9 @@ export class CompareService {
     { resolve: (r: CompareResult) => void; reject: (e: Error) => void }
   >()
 
+  /** Path the worker uses to persist the hash cache (set by the main process). */
+  cachePath: string | undefined
+
   constructor(
     private getWindow: () => BrowserWindow | null,
     // compareWorker.js is emitted alongside index.js (see electron.vite.config.ts).
@@ -75,7 +78,7 @@ export class CompareService {
     const id = this.nextId++
     return new Promise<CompareResult>((resolve, reject) => {
       this.pending.set(id, { resolve, reject })
-      const req: WorkerRequest = { id, leftRoot, rightRoot, options }
+      const req: WorkerRequest = { id, leftRoot, rightRoot, options, cachePath: this.cachePath }
       worker.postMessage(req)
     })
   }

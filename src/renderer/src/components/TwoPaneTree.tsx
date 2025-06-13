@@ -154,6 +154,9 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
           <>
             <span className="icon">{icon}</span>
             <span className="name">{node.name}</span>
+            {node.movedTo && (
+              <span className="moved" title={`Renamed/moved to ${node.movedTo}`}>⇄</span>
+            )}
             {node.kind === 'file' && (
               <span className="meta">
                 {formatSize(node.left.size)} · {formatTime(node.left.mtimeMs)}
@@ -196,6 +199,9 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
           <>
             <span className="icon">{icon}</span>
             <span className="name">{node.name}</span>
+            {node.movedFrom && (
+              <span className="moved" title={`Renamed/moved from ${node.movedFrom}`}>⇄</span>
+            )}
             {node.kind === 'file' && (
               <span className="meta">
                 {formatSize(node.right.size)} · {formatTime(node.right.mtimeMs)}

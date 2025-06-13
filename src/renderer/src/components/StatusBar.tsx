@@ -50,6 +50,11 @@ export function StatusBar({
           <span className="c c-different">⬤ {result.summary.different} different</span>
           <span className="c c-left">⬤ {result.summary.leftOnly} left only</span>
           <span className="c c-right">⬤ {result.summary.rightOnly} right only</span>
+          {result.summary.moved > 0 && (
+            <span className="c c-moved" title="Renamed/moved files (same content, different path)">
+              ⇄ {result.summary.moved} moved
+            </span>
+          )}
           <span className="c c-identical">⬤ {result.summary.identical} identical</span>
           <span className="c c-total">{result.summary.totalFiles} files · {result.elapsedMs} ms</span>
         </div>

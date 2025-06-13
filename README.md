@@ -78,8 +78,9 @@ Notes:
   build runs without a code-signing certificate or elevated privileges. To
   ship signed binaries, provide a certificate via `CSC_LINK`/`CSC_KEY_PASSWORD`
   and remove that flag.
-- No custom app icon is set yet, so the default Electron icon is used. Add one
-  at `build/icon.ico` (256×256+) to brand the installer and window.
+- App icon: `build/icon.ico` brands the installer/shortcuts and `build/icon.png`
+  is the window/taskbar icon (set via `BrowserWindow.icon`, since exe-icon
+  editing is skipped together with signing).
 
 ## Keyboard shortcuts
 

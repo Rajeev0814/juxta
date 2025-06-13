@@ -1,7 +1,7 @@
 import { DiffEditor, type MonacoDiffEditor } from '@monaco-editor/react'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode } from '../../../shared/types'
-import { applyBlock, changedBlockIndices, computeBlocks } from '../../../shared/blocks'
+import { applyBlock, changedBlockIndices, computeBlocks, diffStats, toUnifiedDiff } from '../../../shared/blocks'
 import { languageForPath } from '../lib/language'
 import { juxtaTheme } from '../lib/monacoSetup'
 
@@ -31,6 +31,8 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
   // Inline (unified) view also enables wrapping; side-by-side never wraps
   // (Monaco can't wrap the left/original pane, only the right).
   const [inline, setInline] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [meta, setMeta] = useState({ encoding: '', leftEol: '', rightEol: '' })
 
   const editorRef = useRef<MonacoDiffEditor | null>(null)
 
@@ -53,6 +55,11 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
         setTooLarge((left?.tooLarge ?? false) || (right?.tooLarge ?? false))
         setLeftText(left?.text ?? '')
         setRightText(right?.text ?? '')
+        setMeta({
+          encoding: left?.encoding || right?.encoding || '',
+          leftEol: left?.eol ?? '',
+          rightEol: right?.eol ?? ''
+        })
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       }
@@ -68,6 +75,10 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
     [leftText, rightText]
   )
   const changed = useMemo(() => changedBlockIndices(blocks), [blocks])
+  const stats = useMemo(
+    () => (leftText !== null && rightText !== null ? diffStats(leftText, rightText) : { added: 0, removed: 0 }),
+    [leftText, rightText]
+  )
   const mergeEnabled =
     !binary && !tooLarge && leftText !== null && rightText !== null && blocks.length > 0 &&
     (leftText.length + rightText.length) / 40 < MAX_MERGE_LINES
@@ -141,9 +152,25 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
     editorRef.current = editor
   }
 
+  const copyPatch = useCallback((): void => {
+    if (leftText === null || rightText === null) return
+    const patch = toUnifiedDiff(leftText, rightText, {
+      oldPath: node.left?.path ?? node.name,
+      newPath: node.right?.path ?? node.name
+    })
+    if (!patch) return
+    void window.api.writeClipboard(patch)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }, [leftText, rightText, node])
+
   const loaded = leftText !== null && rightText !== null
   const language = languageForPath(node.left?.path ?? node.right?.path ?? '')
   const counter = changed.length > 0 ? `${Math.min(current + 1, changed.length)}/${changed.length}` : '0'
+  const eolText =
+    meta.leftEol && meta.rightEol && meta.leftEol !== meta.rightEol
+      ? `L:${meta.leftEol} R:${meta.rightEol}`
+      : meta.leftEol || meta.rightEol
 
   return (
     <div className="file-compare">
@@ -153,8 +180,19 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
           {leftDirty && <span className="fc-dirty" title="Left has unsaved changes"> ●L</span>}
           {rightDirty && <span className="fc-dirty" title="Right has unsaved changes"> ●R</span>}
         </span>
+        {meta.encoding && (
+          <span className="fc-enc" title="Detected encoding · line endings">
+            {meta.encoding}
+            {eolText ? ` · ${eolText}` : ''}
+          </span>
+        )}
         <div className="fc-actions">
           <span className="fc-count" title="Changed sections">{counter}</span>
+          {(stats.added > 0 || stats.removed > 0) && (
+            <span className="fc-stats" title="Lines added / removed">
+              <span className="add">+{stats.added}</span> <span className="del">−{stats.removed}</span>
+            </span>
+          )}
           <button onClick={() => goto(-1)} disabled={changed.length === 0} title="Previous difference (Shift+F6)">
             ↑
           </button>
@@ -179,6 +217,9 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
           <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
             {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}
           </button>
+          <button onClick={copyPatch} disabled={!loaded || binary || tooLarge} title="Copy a unified diff (patch) to the clipboard">
+            {copied ? '✓ Copied' : '⎘ Patch'}
+          </button>
           <span className="fc-sep" />
           <button onClick={onClose} title="Back (Esc)">
             ✕ Close
@@ -189,14 +230,12 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
       <div className="file-compare-body">
         {error && <div className="fc-message error">Failed to load: {error}</div>}
         {!error && !loaded && <div className="fc-message">Loading…</div>}
-        {!error && loaded && (binary || tooLarge) && (
-          <div className="fc-message">{binary ? 'Binary file — diff not shown.' : 'File too large to diff.'}</div>
-        )}
-        {!error && loaded && !binary && !tooLarge && (
+        {!error && loaded && tooLarge && <div className="fc-message">File too large to diff.</div>}
+        {!error && loaded && !tooLarge && (
           <DiffEditor
             original={leftText ?? ''}
             modified={rightText ?? ''}
-            language={language}
+            language={binary ? 'plaintext' : language}
             theme={juxtaTheme(theme)}
             onMount={onMount}
             keepCurrentOriginalModel={false}
