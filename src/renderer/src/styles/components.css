@@ -180,6 +180,13 @@
   color: var(--text-dim);
   font-size: 11px;
 }
+.merge-bar .mb-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+}
 .merge-bar .mb-sep {
   width: 1px;
   align-self: stretch;

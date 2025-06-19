@@ -13,6 +13,11 @@ export interface WindowBounds {
   height: number
 }
 
+export interface CompareProfile {
+  name: string
+  options: CompareOptions
+}
+
 export interface PersistedSettings {
   sessions: Session[]
   activeSessionId: string
@@ -20,6 +25,7 @@ export interface PersistedSettings {
   hideIdentical: boolean
   useTrash: boolean
   windowBounds: WindowBounds | null
+  profiles: CompareProfile[]
 }
 
 export function defaultSettings(): PersistedSettings {
@@ -30,7 +36,8 @@ export function defaultSettings(): PersistedSettings {
     theme: 'dark',
     hideIdentical: false,
     useTrash: true,
-    windowBounds: null
+    windowBounds: null,
+    profiles: []
   }
 }
 
@@ -60,7 +67,10 @@ function coerceFilters(raw: unknown): FilterOptions {
     excludeGlobs: stringArray(raw.excludeGlobs, d.excludeGlobs),
     ignoreWhitespace: typeof raw.ignoreWhitespace === 'boolean' ? raw.ignoreWhitespace : d.ignoreWhitespace,
     ignoreCase: typeof raw.ignoreCase === 'boolean' ? raw.ignoreCase : d.ignoreCase,
-    useGitignore: typeof raw.useGitignore === 'boolean' ? raw.useGitignore : d.useGitignore
+    useGitignore: typeof raw.useGitignore === 'boolean' ? raw.useGitignore : d.useGitignore,
+    ignoreLinePattern: typeof raw.ignoreLinePattern === 'string' ? raw.ignoreLinePattern : d.ignoreLinePattern,
+    normalizeJson: typeof raw.normalizeJson === 'boolean' ? raw.normalizeJson : d.normalizeJson,
+    normalizeCsv: typeof raw.normalizeCsv === 'boolean' ? raw.normalizeCsv : d.normalizeCsv
   }
 }
 
@@ -88,6 +98,17 @@ function coerceSession(raw: unknown): Session | null {
     leftText: str(raw.leftText),
     rightText: str(raw.rightText)
   }
+}
+
+function coerceProfiles(raw: unknown): CompareProfile[] {
+  if (!Array.isArray(raw)) return []
+  const out: CompareProfile[] = []
+  for (const p of raw) {
+    if (isObject(p) && typeof p.name === 'string' && p.name) {
+      out.push({ name: p.name, options: coerceOptions(p.options) })
+    }
+  }
+  return out
 }
 
 function coerceBounds(raw: unknown): WindowBounds | null {
@@ -132,5 +153,6 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   if (typeof raw.hideIdentical === 'boolean') s.hideIdentical = raw.hideIdentical
   if (typeof raw.useTrash === 'boolean') s.useTrash = raw.useTrash
   s.windowBounds = coerceBounds(raw.windowBounds)
+  s.profiles = coerceProfiles(raw.profiles)
   return s
 }

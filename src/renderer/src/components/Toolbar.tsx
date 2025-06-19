@@ -1,5 +1,6 @@
 import React from 'react'
 import type { CompareMethod, CompareOptions } from '../../../shared/types'
+import type { CompareProfile } from '../../../shared/settings'
 import { FolderPicker } from './FolderPicker'
 
 interface Props {
@@ -14,6 +15,9 @@ interface Props {
   onCompare: () => void
   onCancel: () => void
   onToggleTheme: () => void
+  profiles: CompareProfile[]
+  onApplyProfile: (name: string) => void
+  onSaveProfile: () => void
 }
 
 const METHODS: { value: CompareMethod; label: string }[] = [
@@ -116,6 +120,60 @@ export function Toolbar(props: Props): React.JSX.Element {
             onChange={(e) => setFilters({ useGitignore: e.target.checked })}
           />
           Respect .gitignore
+        </label>
+
+        <label className="opt grow" title="Lines matching this regex are ignored when comparing content">
+          Ignore lines:
+          <input
+            type="text"
+            placeholder="regex, e.g. ^\s*//"
+            defaultValue={options.filters.ignoreLinePattern}
+            onBlur={(e) => setFilters({ ignoreLinePattern: e.target.value })}
+            spellCheck={false}
+          />
+        </label>
+
+        <label className="opt checkbox" title="Compare .json files by canonical form (ignore formatting & key order)">
+          <input
+            type="checkbox"
+            checked={options.filters.normalizeJson}
+            onChange={(e) => setFilters({ normalizeJson: e.target.checked })}
+          />
+          JSON-aware
+        </label>
+
+        <span className="profiles">
+          <select
+            className="profile-select"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value
+              e.currentTarget.value = ''
+              if (v) props.onApplyProfile(v)
+            }}
+            title="Apply a saved comparison profile"
+          >
+            <option value="" disabled>
+              {props.profiles.length ? 'Profile…' : 'No profiles'}
+            </option>
+            {props.profiles.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={props.onSaveProfile} title="Save current rule + filters as a profile">
+            Save profile
+          </button>
+        </span>
+
+        <label className="opt checkbox" title="Compare .csv/.tsv files ignoring data-row order">
+          <input
+            type="checkbox"
+            checked={options.filters.normalizeCsv}
+            onChange={(e) => setFilters({ normalizeCsv: e.target.checked })}
+          />
+          CSV-aware
         </label>
       </div>
     </div>

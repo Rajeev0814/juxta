@@ -37,11 +37,23 @@ async function cachedHash(
 ): Promise<string | undefined> {
   const ws = options.filters.ignoreWhitespace
   const ic = options.filters.ignoreCase
-  const hit = cache?.get(entry.path, entry.size, entry.mtimeMs, ws, ic)
+  const pattern = options.filters.ignoreLinePattern
+  const normalizeJson = options.filters.normalizeJson
+  const normalizeCsv = options.filters.normalizeCsv
+  // The hash cache keys on ws/ic only, so bypass it when a content-transforming
+  // filter (line-ignore regex / JSON / CSV) is active to avoid stale hits.
+  const useCache = cache && !pattern && !normalizeJson && !normalizeCsv
+  const hit = useCache ? cache.get(entry.path, entry.size, entry.mtimeMs, ws, ic) : undefined
   if (hit !== undefined) return hit
   try {
-    const hash = await hashFile(entry.path, { ignoreWhitespace: ws, ignoreCase: ic })
-    cache?.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
+    const hash = await hashFile(entry.path, {
+      ignoreWhitespace: ws,
+      ignoreCase: ic,
+      ignoreLinePattern: pattern,
+      normalizeJson,
+      normalizeCsv
+    })
+    if (useCache) cache.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
     return hash
   } catch {
     return undefined
@@ -202,7 +214,13 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
       if (m.kind !== 'file') continue
       if (!m.left || !m.right) continue // only-one-side files don't need hashing
       const sizeMatch = m.left.size === m.right.size
-      const mustHash = options.filters.ignoreWhitespace || options.filters.ignoreCase || sizeMatch
+      const mustHash =
+        options.filters.ignoreWhitespace ||
+        options.filters.ignoreCase ||
+        !!options.filters.ignoreLinePattern ||
+        options.filters.normalizeJson ||
+        options.filters.normalizeCsv ||
+        sizeMatch
       if (mustHash) {
         toHash.push(m.left, m.right)
       }

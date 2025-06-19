@@ -16,6 +16,7 @@ interface Props {
   onOpenFile: (node: CompareNode) => void
   onCopy: (node: CompareNode, direction: Side) => void
   onDelete: (node: CompareNode, side: Side) => void
+  onCopyTime: (node: CompareNode, direction: Side) => void
 }
 
 export function TwoPaneTree(props: Props): React.JSX.Element {
@@ -104,6 +105,7 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
                 onOpenFile={props.onOpenFile}
                 onCopy={props.onCopy}
                 onDelete={props.onDelete}
+                onCopyTime={props.onCopyTime}
               />
             ))}
           </div>
@@ -121,9 +123,10 @@ interface RowProps {
   onOpenFile: (node: CompareNode) => void
   onCopy: (node: CompareNode, direction: Side) => void
   onDelete: (node: CompareNode, side: Side) => void
+  onCopyTime: (node: CompareNode, direction: Side) => void
 }
 
-function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete }: RowProps): React.JSX.Element {
+function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete, onCopyTime }: RowProps): React.JSX.Element {
   const { node, depth, hasChildren, expanded } = row
   const isDir = node.kind === 'directory'
 
@@ -178,6 +181,16 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
           <button className="act" title="← Copy to left" onClick={() => onCopy(node, 'right')}>
             ←
           </button>
+        )}
+        {node.kind === 'file' && node.left && node.right && node.status === 'different' && (
+          <>
+            <button className="act" title="Copy left's timestamp to right" onClick={() => onCopyTime(node, 'left')}>
+              🕓→
+            </button>
+            <button className="act" title="Copy right's timestamp to left" onClick={() => onCopyTime(node, 'right')}>
+              ←🕓
+            </button>
+          </>
         )}
         {node.status === 'leftOnly' && (
           <button className="act danger" title="Delete left orphan" onClick={() => onDelete(node, 'left')}>

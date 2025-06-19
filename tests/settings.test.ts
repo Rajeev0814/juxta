@@ -59,6 +59,24 @@ describe('coerceSettings', () => {
     expect(s.sessions[0].options.filters.ignoreCase).toBe(true)
   })
 
+  it('keeps valid comparison profiles and drops nameless/invalid ones', () => {
+    const s = coerceSettings({
+      profiles: [
+        { name: 'Code', options: { method: 'quick', filters: { ignoreWhitespace: true } } },
+        { options: { method: 'content' } }, // no name -> dropped
+        'nope' // not an object -> dropped
+      ]
+    })
+    expect(s.profiles).toHaveLength(1)
+    expect(s.profiles[0].name).toBe('Code')
+    expect(s.profiles[0].options.method).toBe('quick')
+    expect(s.profiles[0].options.filters.ignoreWhitespace).toBe(true)
+  })
+
+  it('defaults profiles to an empty array', () => {
+    expect(coerceSettings({}).profiles).toEqual([])
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,

@@ -32,6 +32,12 @@ export interface FilterOptions {
   ignoreCase: boolean
   /** Load and apply each root's .gitignore as additional exclusions. */
   useGitignore: boolean
+  /** Lines matching this regex are ignored when comparing file content. */
+  ignoreLinePattern: string
+  /** Compare .json files by canonical form (ignore formatting & key order). */
+  normalizeJson: boolean
+  /** Compare .csv/.tsv files ignoring data-row order. */
+  normalizeCsv: boolean
 }
 
 export interface CompareOptions {
@@ -102,7 +108,10 @@ export const DEFAULT_FILTERS: FilterOptions = {
   excludeGlobs: ['**/node_modules/**', '**/.git/**'],
   ignoreWhitespace: false,
   ignoreCase: false,
-  useGitignore: false
+  useGitignore: false,
+  ignoreLinePattern: '',
+  normalizeJson: false,
+  normalizeCsv: false
 }
 
 export const DEFAULT_OPTIONS: CompareOptions = {
