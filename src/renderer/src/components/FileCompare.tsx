@@ -247,7 +247,7 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
               ignoreTrimWhitespace: ignoreWhitespace,
               renderOverviewRuler: true,
               automaticLayout: true,
-              minimap: { enabled: false },
+              minimap: { enabled: true, renderCharacters: false },
               scrollBeyondLastLine: false,
               fontSize: 12,
               diffWordWrap: inline ? 'on' : 'off'

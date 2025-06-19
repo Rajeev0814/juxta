@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode, CompareResult, Side } from '../../shared/types'
 import { listChangedFiles } from '../../shared/nav'
+import { planSync, planTimestamp, type SyncMode } from '../../shared/sync'
+import { toHtmlReport } from '../../shared/report'
+import type { CompareProfile } from '../../shared/settings'
 import {
   createSession,
   sessionTitle,
@@ -36,6 +39,8 @@ export default function App(): React.JSX.Element {
 
   const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
   const [activeId, setActiveId] = useState('session-0')
+  const [profiles, setProfiles] = useState<CompareProfile[]>([])
+  const [live, setLive] = useState(false)
   const [results, setResults] = useState<Record<string, CompareResult | null>>({})
   const [showNew, setShowNew] = useState(false)
 
@@ -88,6 +93,7 @@ export default function App(): React.JSX.Element {
       setTheme(s.theme)
       setHideIdentical(s.hideIdentical)
       setUseTrash(s.useTrash)
+      setProfiles(s.profiles)
       hydratedRef.current = true
     })
     return () => {
@@ -104,11 +110,12 @@ export default function App(): React.JSX.Element {
         theme,
         hideIdentical,
         useTrash,
-        windowBounds: null
+        windowBounds: null,
+        profiles
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, useTrash])
+  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -174,6 +181,20 @@ export default function App(): React.JSX.Element {
     })
   }, [active, updateActive])
 
+  const applyProfile = useCallback(
+    (name: string) => {
+      const p = profiles.find((x) => x.name === name)
+      if (p) updateActive({ options: p.options })
+    },
+    [profiles, updateActive]
+  )
+
+  const saveProfile = useCallback(() => {
+    const name = window.prompt('Save current rule + filters as profile named:')?.trim()
+    if (!name) return
+    setProfiles((list) => [...list.filter((p) => p.name !== name), { name, options: active.options }])
+  }, [active.options])
+
   const openFile = useCallback((node: CompareNode) => {
     if (node.kind !== 'file') return
     setActiveNode(node)
@@ -220,6 +241,16 @@ export default function App(): React.JSX.Element {
     [refresh, useTrash]
   )
 
+  const onCopyTime = useCallback(
+    async (node: CompareNode, direction: Side) => {
+      const plan = planTimestamp(node, direction)
+      if (!plan) return
+      await window.api.setFileTimes(plan.path, plan.mtimeMs)
+      void refresh()
+    },
+    [refresh]
+  )
+
   const makeMatch = useCallback(
     async (direction: Side) => {
       if (!result) return
@@ -236,6 +267,59 @@ export default function App(): React.JSX.Element {
     },
     [result, refresh, useTrash]
   )
+
+  // --- Folder sync (mirror / update / two-way) with dry-run preview --------
+  const runSync = useCallback(
+    async (mode: SyncMode, direction?: Side) => {
+      if (!result) return
+      const { actions, conflicts } = planSync(result.root, result.leftRoot, result.rightRoot, {
+        mode,
+        direction
+      })
+      const copies = actions.filter((a) => a.kind === 'copy').length
+      const deletes = actions.filter((a) => a.kind === 'delete').length
+      if (copies === 0 && deletes === 0) {
+        window.alert('Already in sync — nothing to do.' + (conflicts.length ? `\n(${conflicts.length} conflict(s))` : ''))
+        return
+      }
+      const lines = [`Sync preview:`, `  ${copies} copy, ${deletes} delete`]
+      if (conflicts.length) lines.push(`  ${conflicts.length} conflict(s) skipped (both sides changed)`)
+      lines.push('', 'Proceed?')
+      if (!window.confirm(lines.join('\n'))) return
+      await window.api.applyPlan(actions, useTrash)
+      void refresh()
+    },
+    [result, useTrash, refresh]
+  )
+
+  const onSyncSelect = useCallback(
+    (value: string) => {
+      if (value === 'twoWay') void runSync('twoWay')
+      else {
+        const [mode, dir] = value.split(':')
+        void runSync(mode as SyncMode, dir as Side)
+      }
+    },
+    [runSync]
+  )
+
+  // --- Live re-compare: watch the active folder roots while enabled --------
+  useEffect(() => {
+    const watchable =
+      live && active.type === 'folders' && active.leftRoot && active.rightRoot
+        ? [active.leftRoot, active.rightRoot]
+        : null
+    void window.api.setWatch(watchable)
+    return () => {
+      void window.api.setWatch(null)
+    }
+  }, [live, active.type, active.leftRoot, active.rightRoot])
+
+  useEffect(() => {
+    return window.api.onWatchChanged(() => {
+      if (live && active.type === 'folders' && view === 'folder') void refresh()
+    })
+  }, [live, active.type, view, refresh])
 
   // --- Menu actions ---------------------------------------------------------
   useEffect(() => {
@@ -358,6 +442,9 @@ export default function App(): React.JSX.Element {
             onCompare={() => void runCompare()}
             onCancel={cancel}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            profiles={profiles}
+            onApplyProfile={applyProfile}
+            onSaveProfile={saveProfile}
           />
 
           {result && view === 'folder' && (
@@ -369,9 +456,40 @@ export default function App(): React.JSX.Element {
                 ↧ Next diff
               </button>
               <span className="nav-count">{navList.length} changed</span>
+              <label className="mb-toggle" title="Re-compare automatically when files change">
+                <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
+                👁 Live
+              </label>
               <span className="mb-sep" />
               <button onClick={() => makeMatch('left')}>⇒ Make right match left</button>
               <button onClick={() => makeMatch('right')}>⇐ Make left match right</button>
+              <select
+                className="sync-select"
+                value=""
+                onChange={(e) => {
+                  const v = e.target.value
+                  e.currentTarget.value = ''
+                  if (v) onSyncSelect(v)
+                }}
+                title="Synchronize folders (preview before applying)"
+              >
+                <option value="" disabled>
+                  Sync…
+                </option>
+                <option value="mirror:left">Mirror L→R (exact)</option>
+                <option value="mirror:right">Mirror R→L (exact)</option>
+                <option value="update:left">Update L→R (no deletes)</option>
+                <option value="update:right">Update R→L (no deletes)</option>
+                <option value="twoWay">Two-way (newer wins)</option>
+              </select>
+              <button
+                onClick={() => {
+                  if (result) void window.api.saveText('juxta-report.html', toHtmlReport(result))
+                }}
+                title="Export an HTML report of this comparison"
+              >
+                ⤓ Report
+              </button>
               <span className="hint">F4 next diff · F5 re-compare · double-click a file to diff</span>
             </div>
           )}
@@ -395,6 +513,7 @@ export default function App(): React.JSX.Element {
                 onOpenFile={openFile}
                 onCopy={onCopy}
                 onDelete={onDelete}
+                onCopyTime={onCopyTime}
               />
             )}
             {view === 'file' && activeNode && (

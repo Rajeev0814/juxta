@@ -13,21 +13,21 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ✅ A7. Native application menu wired to actions
 
 ## B. Beyond Compare parity (core)
-- ⬜ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
+- ✅ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
 - ⬜ B2. 3-way merge (files + folders) with auto-merge
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ✅ B4. Moved / renamed detection (match by content hash)
-- ⬜ B5. Per-file-type rules / ignore comments via regex
+- 🟦 B5. Ignore-lines-by-regex (✅ content hashing); ⬜ per-file-type rule sets
 - 🟦 B6. Encoding & line-ending — ✅ detect UTF-8/UTF-16 + EOL, fix UTF-16 decode; ⬜ conversion on save
-- 🟦 B7. Reports & patch — ✅ unified-diff "Copy patch"; ⬜ HTML report, apply-patch
+- 🟦 B7. Reports & patch — ✅ unified-diff "Copy patch", ✅ HTML report export; ⬜ apply-patch
 - ⬜ B8. Snapshots (capture + compare against)
-- ⬜ B9. Timestamp / attribute operations
+- ✅ B9. Timestamp operations (copy mtime across without copying content)
 
 ## C. Specialized comparators
 - ⬜ C1. Image compare (side-by-side, overlay, swipe, pixel diff)
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
-- ⬜ C3. Table compare (CSV/TSV with key-column alignment)
-- ⬜ C4. Structured data compare (JSON/YAML/XML aligned by key)
+- 🟦 C3. Table compare — ✅ CSV/TSV-aware (ignore row order); ⬜ key-column-aligned table view
+- 🟦 C4. Structured data — ✅ JSON-aware compare (ignore formatting/key order); ⬜ YAML/XML, key-aligned diff view
 - ⬜ C5. AST / semantic code diff
 - ⬜ C6. Document text compare (PDF / Office)
 - ⬜ C7. Archive browsing (zip/tar as virtual folders)
@@ -41,10 +41,10 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 
 ## E. Performance & robustness
 - ✅ E1. Persistent hash cache (path+size+mtime+flags keyed)
-- ⬜ E2. File-watch / live re-compare
+- ✅ E2. File-watch / live re-compare (debounced auto-refresh)
 - ⬜ E3. Streaming / byte-range compare for huge files
 
 ## F. Differentiators
 - 🟦 F1. Diff insights — ✅ +added/−removed line stats (file/text); ⬜ folder churn heatmap
-- ⬜ F2. Minimap / overview ruler with diff markers
-- ⬜ F3. Comparison profiles per project + settings sync
+- ✅ F2. Minimap + overview ruler with diff markers
+- 🟦 F3. Comparison profiles — ✅ save/apply named rule+filter profiles (persisted); ⬜ per-project scoping / cloud sync

@@ -1,5 +1,6 @@
 import type { CompareOptions, CompareResult, ProgressUpdate, Side } from './types'
 import type { PersistedSettings } from './settings'
+import type { MergeAction } from './sync'
 
 // Channel names used across the IPC boundary, kept in one place.
 export const IPC = {
@@ -10,14 +11,19 @@ export const IPC = {
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
   writeFile: 'fs:writeFile',
+  saveText: 'fs:saveText',
   writeClipboard: 'clipboard:write',
   copyEntry: 'merge:copyEntry',
   deleteEntry: 'merge:deleteEntry',
+  setFileTimes: 'fs:setFileTimes',
   makeMatch: 'merge:makeMatch',
+  applyPlan: 'merge:applyPlan',
   setTheme: 'app:setTheme',
   loadSettings: 'settings:load',
   saveSettings: 'settings:save',
-  menuAction: 'menu:action' // main -> renderer (event)
+  menuAction: 'menu:action', // main -> renderer (event)
+  setWatch: 'watch:set',
+  watchChanged: 'watch:changed' // main -> renderer (event)
 } as const
 
 export interface CompareRequest {
@@ -69,13 +75,21 @@ export interface RendererApi {
   readFile(path: string): Promise<FileContents>
   writeFile(path: string, text: string): Promise<void>
   writeClipboard(text: string): Promise<void>
+  /** Prompt for a save location and write text; returns the path or null if cancelled. */
+  saveText(defaultName: string, content: string): Promise<string | null>
   copyEntry(req: CopyRequest): Promise<void>
   deleteEntry(req: DeleteRequest): Promise<void>
+  /** Set a file's modification time (ms since epoch) without copying content. */
+  setFileTimes(path: string, mtimeMs: number): Promise<void>
   makeMatch(req: MakeMatchRequest): Promise<void>
+  applyPlan(actions: MergeAction[], toTrash: boolean): Promise<void>
   setTheme(theme: 'light' | 'dark'): Promise<void>
   /** Resolve the absolute path of a dropped folder (Electron's File.path replacement). */
   getPathForFile(file: File): string
   loadSettings(): Promise<PersistedSettings>
   saveSettings(settings: PersistedSettings): Promise<void>
   onMenuAction(cb: (action: string) => void): () => void
+  /** Watch these roots for changes (pass null/[] to stop). */
+  setWatch(paths: string[] | null): Promise<void>
+  onWatchChanged(cb: () => void): () => void
 }

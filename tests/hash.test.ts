@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
-import { hashFile, hashFileRaw, normalizeText } from '../src/core/hash'
+import { dropIgnoredLines, hashFile, hashFileRaw, normalizeText } from '../src/core/hash'
 import { makeTree } from './helpers'
 
 describe('normalizeText', () => {
@@ -9,6 +9,16 @@ describe('normalizeText', () => {
   })
   it('normalizes CRLF to LF', () => {
     expect(normalizeText('a\r\nb')).toBe('a\nb')
+  })
+})
+
+describe('dropIgnoredLines', () => {
+  it('removes lines matching the regex', () => {
+    expect(dropIgnoredLines('a\n// note\nb', '^\\s*//')).toBe('a\nb')
+  })
+  it('returns text unchanged for empty or invalid pattern', () => {
+    expect(dropIgnoredLines('a\nb', '')).toBe('a\nb')
+    expect(dropIgnoredLines('a\nb', '(')).toBe('a\nb') // invalid regex
   })
 })
 

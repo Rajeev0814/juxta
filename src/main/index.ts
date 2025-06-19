@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { readFile, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
 import { buildMenuTemplate, type MenuActionId } from './menu'
 import {
@@ -10,12 +10,13 @@ import {
   type FileContents,
   type MakeMatchRequest
 } from '../shared/ipc'
-import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch } from '../core/merge'
+import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch, type MergeAction } from '../core/merge'
 import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
 import { toHexDump } from '../core/hex'
 import { DEFAULT_SETTINGS, type PersistedSettings, type WindowBounds } from '../shared/settings'
 import { loadSettings, saveSettings } from './settings'
 import { CompareService } from './compareService'
+import { FolderWatcher } from './watchService'
 
 const isDev = !app.isPackaged
 /** Files above this size are not loaded into the diff editor. */
@@ -26,6 +27,7 @@ const MAX_HEX_BYTES = 256 * 1024
 let mainWindow: BrowserWindow | null = null
 let settings: PersistedSettings = DEFAULT_SETTINGS
 const compareService = new CompareService(() => mainWindow)
+const folderWatcher = new FolderWatcher(() => mainWindow?.webContents.send(IPC.watchChanged))
 
 /** Clamp saved bounds onto the current display so the window is always visible. */
 function resolveBounds(saved: WindowBounds | null): WindowBounds {
@@ -122,6 +124,11 @@ function registerIpc(): void {
     compareService.cancel()
   })
 
+  ipcMain.handle(IPC.setWatch, async (_e, paths: string[] | null) => {
+    if (paths && paths.length) folderWatcher.watch(paths)
+    else folderWatcher.close()
+  })
+
   ipcMain.handle(IPC.readFile, async (_e, path: string): Promise<FileContents> => {
     const info = await stat(path)
     if (info.size > MAX_DIFF_FILE_BYTES) {
@@ -161,6 +168,13 @@ function registerIpc(): void {
     clipboard.writeText(text)
   })
 
+  ipcMain.handle(IPC.saveText, async (_e, defaultName: string, content: string): Promise<string | null> => {
+    const result = await dialog.showSaveDialog(mainWindow!, { defaultPath: defaultName })
+    if (result.canceled || !result.filePath) return null
+    await writeFile(result.filePath, content, 'utf8')
+    return result.filePath
+  })
+
   ipcMain.handle(IPC.copyEntry, async (_e, req: CopyRequest) => {
     await copyEntry(req.srcPath, req.destPath)
   })
@@ -169,9 +183,18 @@ function registerIpc(): void {
     await removeEntry(req.path, req.toTrash)
   })
 
+  ipcMain.handle(IPC.setFileTimes, async (_e, path: string, mtimeMs: number) => {
+    const t = mtimeMs / 1000
+    await utimes(path, t, t)
+  })
+
   ipcMain.handle(IPC.makeMatch, async (_e, req: MakeMatchRequest) => {
     const plan = planMakeMatch(req.result.root, req.direction, req.result.leftRoot, req.result.rightRoot)
     await applyMergePlan(plan, { remove: (p) => removeEntry(p, req.toTrash) })
+  })
+
+  ipcMain.handle(IPC.applyPlan, async (_e, actions: MergeAction[], toTrash: boolean) => {
+    await applyMergePlan(actions, { remove: (p) => removeEntry(p, toTrash) })
   })
 
   ipcMain.handle(IPC.setTheme, async (_e, theme: 'light' | 'dark') => {
@@ -202,5 +225,6 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   compareService.dispose()
+  folderWatcher.close()
   if (process.platform !== 'darwin') app.quit()
 })

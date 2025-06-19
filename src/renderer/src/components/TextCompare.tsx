@@ -199,7 +199,7 @@ export function TextCompare({
             ignoreTrimWhitespace: ignoreWhitespace,
             renderOverviewRuler: true,
             automaticLayout: true,
-            minimap: { enabled: false },
+            minimap: { enabled: true, renderCharacters: false },
             scrollBeyondLastLine: false,
             fontSize: 12,
             diffWordWrap: inline ? 'on' : 'off'

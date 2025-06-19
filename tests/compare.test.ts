@@ -82,6 +82,57 @@ describe('compareFolders — ignore whitespace', () => {
   })
 })
 
+describe('compareFolders — ignore-line pattern', () => {
+  it('treats files differing only in ignored lines as identical', async () => {
+    const left = await makeTree({ 'f.ts': '// left comment\nconst x = 1' })
+    const right = await makeTree({ 'f.ts': '// right comment\nconst x = 1' })
+
+    const without = await compareFolders({ leftRoot: left, rightRoot: right, options: opts() })
+    expect(indexNodes(without.root).get('f.ts')!.status).toBe('different')
+
+    const withPattern = await compareFolders({
+      leftRoot: left,
+      rightRoot: right,
+      options: opts({ filters: { ...DEFAULT_FILTERS, excludeGlobs: [], ignoreLinePattern: '^\\s*//' } })
+    })
+    expect(indexNodes(withPattern.root).get('f.ts')!.status).toBe('identical')
+  })
+})
+
+describe('compareFolders — JSON-aware', () => {
+  it('treats reordered/reformatted JSON as identical when enabled', async () => {
+    const left = await makeTree({ 'config.json': '{ "b": 1, "a": 2 }' })
+    const right = await makeTree({ 'config.json': '{\n  "a": 2,\n  "b": 1\n}' })
+
+    const off = await compareFolders({ leftRoot: left, rightRoot: right, options: opts() })
+    expect(indexNodes(off.root).get('config.json')!.status).toBe('different')
+
+    const on = await compareFolders({
+      leftRoot: left,
+      rightRoot: right,
+      options: opts({ filters: { ...DEFAULT_FILTERS, excludeGlobs: [], normalizeJson: true } })
+    })
+    expect(indexNodes(on.root).get('config.json')!.status).toBe('identical')
+  })
+})
+
+describe('compareFolders — CSV-aware', () => {
+  it('treats reordered CSV rows as identical when enabled', async () => {
+    const left = await makeTree({ 'data.csv': 'id,name\n1,amy\n2,bob' })
+    const right = await makeTree({ 'data.csv': 'id,name\n2,bob\n1,amy' })
+
+    const off = await compareFolders({ leftRoot: left, rightRoot: right, options: opts() })
+    expect(indexNodes(off.root).get('data.csv')!.status).toBe('different')
+
+    const on = await compareFolders({
+      leftRoot: left,
+      rightRoot: right,
+      options: opts({ filters: { ...DEFAULT_FILTERS, excludeGlobs: [], normalizeCsv: true } })
+    })
+    expect(indexNodes(on.root).get('data.csv')!.status).toBe('identical')
+  })
+})
+
 describe('compareFolders — quick and size+time methods', () => {
   it('quick method considers equal-size files identical even if content differs', async () => {
     const left = await makeTree({ 'f.txt': 'abcd' })
