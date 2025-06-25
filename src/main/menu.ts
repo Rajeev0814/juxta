@@ -8,6 +8,7 @@ export type MenuActionId =
   | 'toggleTheme'
   | 'toggleHideIdentical'
   | 'swapSides'
+  | 'gitSetup'
   | 'about'
 
 export interface MenuEnv {
@@ -81,7 +82,11 @@ export function buildMenuTemplate(
     },
     {
       role: 'help',
-      submenu: [{ label: 'About Juxta', click: () => send('about') }]
+      submenu: [
+        { label: 'Set up as Git difftool…', click: () => send('gitSetup') },
+        { type: 'separator' },
+        { label: 'About Juxta', click: () => send('about') }
+      ]
     }
   )
 

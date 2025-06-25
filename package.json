@@ -60,10 +60,12 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
+    "adm-zip": "^0.5.16",
     "monaco-editor": "^0.52.2",
     "picomatch": "^4.0.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^22.10.5",
     "@types/picomatch": "^3.0.1",
     "@types/react": "^18.3.18",

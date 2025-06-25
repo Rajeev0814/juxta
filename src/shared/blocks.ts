@@ -53,6 +53,38 @@ function arraysEqual(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((x, i) => x === b[i])
 }
 
+export interface MatchingBlock {
+  aStart: number
+  bStart: number
+  len: number
+}
+
+/** Maximal runs of equal lines between a and b (from the LCS), in order. */
+export function matchingBlocks(a: string[], b: string[]): MatchingBlock[] {
+  const ops = lcsDiff(a, b)
+  const blocks: MatchingBlock[] = []
+  let ai = 0
+  let bi = 0
+  let cur: MatchingBlock | null = null
+  for (const op of ops) {
+    if (op.t === 'eq') {
+      if (!cur) cur = { aStart: ai, bStart: bi, len: 0 }
+      cur.len++
+      ai++
+      bi++
+    } else {
+      if (cur) {
+        blocks.push(cur)
+        cur = null
+      }
+      if (op.t === 'del') ai++
+      else bi++
+    }
+  }
+  if (cur) blocks.push(cur)
+  return blocks
+}
+
 /** Split text into lines for diffing. */
 export function toLines(text: string): string[] {
   return text.split('\n')
