@@ -17,6 +17,10 @@ import { FolderPicker } from './components/FolderPicker'
 import { TwoPaneTree } from './components/TwoPaneTree'
 import { FileCompare } from './components/FileCompare'
 import { TextCompare } from './components/TextCompare'
+import { MergeView } from './components/MergeView'
+import { ArchiveCompareView } from './components/ArchiveCompareView'
+import { isArchivePath } from '../../shared/archive'
+import type { MergeArgs } from '../../shared/git'
 import { StatusBar } from './components/StatusBar'
 import { useCompare } from './hooks/useCompare'
 import { joinPath } from './lib/path'
@@ -41,6 +45,7 @@ export default function App(): React.JSX.Element {
   const [activeId, setActiveId] = useState('session-0')
   const [profiles, setProfiles] = useState<CompareProfile[]>([])
   const [live, setLive] = useState(false)
+  const [mergeRequest, setMergeRequest] = useState<MergeArgs | null>(null)
   const [results, setResults] = useState<Record<string, CompareResult | null>>({})
   const [showNew, setShowNew] = useState(false)
 
@@ -132,6 +137,13 @@ export default function App(): React.JSX.Element {
     setSessions((list) => [...list, s])
     setActiveId(s.id)
     setShowNew(false)
+  }, [])
+
+  // Open a File Compare tab for two given paths (used by git difftool launches).
+  const openFilesSession = useCallback((left: string, right: string): void => {
+    const s = { ...createSession('files', genId()), leftFile: left, rightFile: right }
+    setSessions((list) => [...list, s])
+    setActiveId(s.id)
   }, [])
 
   const closeSession = useCallback(
@@ -303,6 +315,22 @@ export default function App(): React.JSX.Element {
     [runSync]
   )
 
+  // --- Git difftool: open launch/forwarded diff pairs as File Compare tabs -
+  useEffect(() => {
+    void window.api.getLaunchDiff().then((pair) => {
+      if (pair) openFilesSession(pair.left, pair.right)
+    })
+    void window.api.getLaunchMerge().then((m) => {
+      if (m) setMergeRequest(m)
+    })
+    const offDiff = window.api.onOpenDiff((pair) => openFilesSession(pair.left, pair.right))
+    const offMerge = window.api.onOpenMerge((m) => setMergeRequest(m))
+    return () => {
+      offDiff()
+      offMerge()
+    }
+  }, [openFilesSession])
+
   // --- Live re-compare: watch the active folder roots while enabled --------
   useEffect(() => {
     const watchable =
@@ -346,6 +374,15 @@ export default function App(): React.JSX.Element {
         case 'swapSides':
           swapSides()
           break
+        case 'gitSetup':
+          void window.api.getGitSetup().then((cmds) => {
+            void window.api.writeClipboard(cmds)
+            window.alert(
+              'Run these in a shell (e.g. Git Bash) to use Juxta with `git difftool` — copied to your clipboard:\n\n' +
+                cmds
+            )
+          })
+          break
         case 'about':
           window.alert('Juxta — a desktop file & folder comparison and merge tool.')
           break
@@ -358,7 +395,7 @@ export default function App(): React.JSX.Element {
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'F6') {
         e.preventDefault()
-        if (view === 'file' || active.type === 'files' || active.type === 'text')
+        if (mergeRequest || view === 'file' || active.type === 'files' || active.type === 'text')
           (e.shiftKey ? navRef.current?.prev : navRef.current?.next)?.()
       } else if (e.key === 'Escape' && view === 'file') {
         e.preventDefault()
@@ -367,7 +404,7 @@ export default function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, active.type])
+  }, [view, active.type, mergeRequest])
 
   const directNode = useMemo<CompareNode | null>(() => {
     if (active.type !== 'files') return null
@@ -381,6 +418,22 @@ export default function App(): React.JSX.Element {
       right: active.rightFile ? { path: active.rightFile, size: 0, mtimeMs: 0 } : undefined
     }
   }, [active.type, active.leftFile, active.rightFile])
+
+  // Mergetool launch takes over the whole window until done.
+  if (mergeRequest) {
+    return (
+      <div className="app">
+        <MergeView
+          args={mergeRequest}
+          theme={theme}
+          onDone={() => setMergeRequest(null)}
+          registerNav={(nav) => {
+            navRef.current = nav
+          }}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="app">
@@ -514,6 +567,7 @@ export default function App(): React.JSX.Element {
                 onCopy={onCopy}
                 onDelete={onDelete}
                 onCopyTime={onCopyTime}
+                onContextMenu={(path) => void window.api.popupPathMenu(path)}
               />
             )}
             {view === 'file' && activeNode && (
@@ -541,7 +595,9 @@ export default function App(): React.JSX.Element {
             </div>
           </div>
           <div className="app-body">
-            {directNode ? (
+            {active.leftFile && active.rightFile && isArchivePath(active.leftFile) && isArchivePath(active.rightFile) ? (
+              <ArchiveCompareView left={active.leftFile} right={active.rightFile} hideIdentical={hideIdentical} />
+            ) : directNode ? (
               <FileCompare
                 key={`${active.id}:${active.leftFile}|${active.rightFile}`}
                 node={directNode}

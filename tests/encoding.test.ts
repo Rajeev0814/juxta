@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { decodeText, detectEncoding, detectEol } from '../src/core/encoding'
+import { convertEol } from '../src/shared/eol'
 
 describe('detectEncoding', () => {
   it('detects plain UTF-8', () => {
@@ -41,5 +42,17 @@ describe('detectEol', () => {
     expect(detectEol('a\r\nb\r\nc')).toBe('crlf')
     expect(detectEol('a\r\nb\nc')).toBe('mixed')
     expect(detectEol('abc')).toBe('none')
+  })
+})
+
+describe('convertEol', () => {
+  it('converts to CRLF and to LF, normalizing mixed input', () => {
+    expect(convertEol('a\nb', 'crlf')).toBe('a\r\nb')
+    expect(convertEol('a\r\nb', 'lf')).toBe('a\nb')
+    expect(convertEol('a\r\nb\nc\rd', 'lf')).toBe('a\nb\nc\nd')
+    expect(convertEol('a\r\nb\nc', 'crlf')).toBe('a\r\nb\r\nc')
+  })
+  it('is idempotent', () => {
+    expect(convertEol(convertEol('a\nb', 'crlf'), 'crlf')).toBe('a\r\nb')
   })
 })

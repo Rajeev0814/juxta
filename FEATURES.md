@@ -14,11 +14,11 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 
 ## B. Beyond Compare parity (core)
 - ✅ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
-- ⬜ B2. 3-way merge (files + folders) with auto-merge
+- 🟦 B2. 3-way merge — ✅ diff3 auto-merge core + mergetool view (conflict nav, save); ⬜ folder 3-way, in-pane resolve buttons
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ✅ B4. Moved / renamed detection (match by content hash)
 - 🟦 B5. Ignore-lines-by-regex (✅ content hashing); ⬜ per-file-type rule sets
-- 🟦 B6. Encoding & line-ending — ✅ detect UTF-8/UTF-16 + EOL, fix UTF-16 decode; ⬜ conversion on save
+- ✅ B6. Encoding & line-ending — detect UTF-8/UTF-16 + EOL, fix UTF-16 decode, convert EOL (LF/CRLF) on save
 - 🟦 B7. Reports & patch — ✅ unified-diff "Copy patch", ✅ HTML report export; ⬜ apply-patch
 - ⬜ B8. Snapshots (capture + compare against)
 - ✅ B9. Timestamp operations (copy mtime across without copying content)
@@ -30,11 +30,11 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - 🟦 C4. Structured data — ✅ JSON-aware compare (ignore formatting/key order); ⬜ YAML/XML, key-aligned diff view
 - ⬜ C5. AST / semantic code diff
 - ⬜ C6. Document text compare (PDF / Office)
-- ⬜ C7. Archive browsing (zip/tar as virtual folders)
+- 🟦 C7. Archive browsing — ✅ compare two .zip-family archives as a content tree; ⬜ tar/gz, drill into entries, browse archive vs folder
 
 ## D. Remote & integration
 - ⬜ D1. Remote folders (SFTP/FTP, S3, ...)
-- ⬜ D2. Git difftool / mergetool + conflict resolution
+- 🟦 D2. Git — ✅ difftool (open `--git-diff` pairs, single-instance, setup helper); ⬜ mergetool (needs 3-way)
 - ⬜ D3. CLI invocation + automation API
 - ⬜ D4. OS shell integration (context menu)
 - ⬜ D5. Plugin system

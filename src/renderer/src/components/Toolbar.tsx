@@ -44,7 +44,7 @@ export function Toolbar(props: Props): React.JSX.Element {
         <FolderPicker label="Right" value={props.rightRoot} onChange={props.onRightRoot} />
       </div>
 
-      <div className="toolbar-row options">
+      <div className="toolbar-row controls">
         <button
           className="primary compare-btn"
           disabled={props.comparing || !props.leftRoot || !props.rightRoot}
@@ -73,6 +73,33 @@ export function Toolbar(props: Props): React.JSX.Element {
           </select>
         </label>
 
+        <span className="profiles">
+          <select
+            className="profile-select"
+            value=""
+            onChange={(e) => {
+              const v = e.target.value
+              e.currentTarget.value = ''
+              if (v) props.onApplyProfile(v)
+            }}
+            title="Apply a saved comparison profile"
+          >
+            <option value="" disabled>
+              {props.profiles.length ? 'Profile…' : 'No profiles'}
+            </option>
+            {props.profiles.map((p) => (
+              <option key={p.name} value={p.name}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button onClick={props.onSaveProfile} title="Save current rule + filters as a profile">
+            Save profile
+          </button>
+        </span>
+      </div>
+
+      <div className="toolbar-row filters">
         <label className="opt grow">
           Include:
           <input
@@ -94,7 +121,9 @@ export function Toolbar(props: Props): React.JSX.Element {
             spellCheck={false}
           />
         </label>
+      </div>
 
+      <div className="toolbar-row filters">
         <label className="opt checkbox">
           <input
             type="checkbox"
@@ -122,17 +151,6 @@ export function Toolbar(props: Props): React.JSX.Element {
           Respect .gitignore
         </label>
 
-        <label className="opt grow" title="Lines matching this regex are ignored when comparing content">
-          Ignore lines:
-          <input
-            type="text"
-            placeholder="regex, e.g. ^\s*//"
-            defaultValue={options.filters.ignoreLinePattern}
-            onBlur={(e) => setFilters({ ignoreLinePattern: e.target.value })}
-            spellCheck={false}
-          />
-        </label>
-
         <label className="opt checkbox" title="Compare .json files by canonical form (ignore formatting & key order)">
           <input
             type="checkbox"
@@ -142,31 +160,6 @@ export function Toolbar(props: Props): React.JSX.Element {
           JSON-aware
         </label>
 
-        <span className="profiles">
-          <select
-            className="profile-select"
-            value=""
-            onChange={(e) => {
-              const v = e.target.value
-              e.currentTarget.value = ''
-              if (v) props.onApplyProfile(v)
-            }}
-            title="Apply a saved comparison profile"
-          >
-            <option value="" disabled>
-              {props.profiles.length ? 'Profile…' : 'No profiles'}
-            </option>
-            {props.profiles.map((p) => (
-              <option key={p.name} value={p.name}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button onClick={props.onSaveProfile} title="Save current rule + filters as a profile">
-            Save profile
-          </button>
-        </span>
-
         <label className="opt checkbox" title="Compare .csv/.tsv files ignoring data-row order">
           <input
             type="checkbox"
@@ -174,6 +167,17 @@ export function Toolbar(props: Props): React.JSX.Element {
             onChange={(e) => setFilters({ normalizeCsv: e.target.checked })}
           />
           CSV-aware
+        </label>
+
+        <label className="opt grow" title="Lines matching this regex are ignored when comparing content">
+          Ignore lines:
+          <input
+            type="text"
+            placeholder="regex, e.g. ^\s*//"
+            defaultValue={options.filters.ignoreLinePattern}
+            onBlur={(e) => setFilters({ ignoreLinePattern: e.target.value })}
+            spellCheck={false}
+          />
         </label>
       </div>
     </div>

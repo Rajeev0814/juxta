@@ -14,6 +14,8 @@ const api: RendererApi = {
   selectFolder: () => ipcRenderer.invoke(IPC.selectFolder),
   selectFile: () => ipcRenderer.invoke(IPC.selectFile),
   compare: (req: CompareRequest): Promise<CompareResult> => ipcRenderer.invoke(IPC.compare, req),
+  compareArchives: (leftPath: string, rightPath: string): Promise<CompareResult> =>
+    ipcRenderer.invoke(IPC.compareArchives, leftPath, rightPath),
   cancelCompare: () => ipcRenderer.invoke(IPC.cancelCompare),
   onProgress: (cb: (update: ProgressUpdate) => void) => {
     const listener = (_e: unknown, update: ProgressUpdate): void => cb(update)
@@ -27,6 +29,8 @@ const api: RendererApi = {
   copyEntry: (req: CopyRequest) => ipcRenderer.invoke(IPC.copyEntry, req),
   deleteEntry: (req: DeleteRequest) => ipcRenderer.invoke(IPC.deleteEntry, req),
   setFileTimes: (path: string, mtimeMs: number) => ipcRenderer.invoke(IPC.setFileTimes, path, mtimeMs),
+  showInFolder: (path: string) => ipcRenderer.invoke(IPC.showInFolder, path),
+  popupPathMenu: (path: string) => ipcRenderer.invoke(IPC.popupPathMenu, path),
   makeMatch: (req: MakeMatchRequest) => ipcRenderer.invoke(IPC.makeMatch, req),
   applyPlan: (actions, toTrash) => ipcRenderer.invoke(IPC.applyPlan, actions, toTrash),
   setTheme: (theme: 'light' | 'dark') => ipcRenderer.invoke(IPC.setTheme, theme),
@@ -43,6 +47,19 @@ const api: RendererApi = {
     const listener = (): void => cb()
     ipcRenderer.on(IPC.watchChanged, listener)
     return () => ipcRenderer.removeListener(IPC.watchChanged, listener)
+  },
+  getLaunchDiff: () => ipcRenderer.invoke(IPC.getLaunchDiff),
+  getGitSetup: () => ipcRenderer.invoke(IPC.getGitSetup),
+  onOpenDiff: (cb: (pair: { left: string; right: string }) => void) => {
+    const listener = (_e: unknown, pair: { left: string; right: string }): void => cb(pair)
+    ipcRenderer.on(IPC.openDiff, listener)
+    return () => ipcRenderer.removeListener(IPC.openDiff, listener)
+  },
+  getLaunchMerge: () => ipcRenderer.invoke(IPC.getLaunchMerge),
+  onOpenMerge: (cb: (args: import('../shared/git').MergeArgs) => void) => {
+    const listener = (_e: unknown, args: import('../shared/git').MergeArgs): void => cb(args)
+    ipcRenderer.on(IPC.openMerge, listener)
+    return () => ipcRenderer.removeListener(IPC.openMerge, listener)
   }
 }
 

@@ -7,9 +7,9 @@ import react from '@vitejs/plugin-react'
 // second rollup input for the main process and emit it next to the main bundle.
 export default defineConfig({
   main: {
-    // Bundle picomatch into the main/worker output so the packaged app needs
-    // no node_modules at runtime (electron + node built-ins stay external).
-    plugins: [externalizeDepsPlugin({ exclude: ['picomatch'] })],
+    // Bundle these into the main/worker output so the packaged app needs no
+    // node_modules at runtime (electron + node built-ins stay external).
+    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip'] })],
     build: {
       rollupOptions: {
         input: {
@@ -24,9 +24,9 @@ export default defineConfig({
     }
   },
   preload: {
-    // Bundle picomatch into the main/worker output so the packaged app needs
-    // no node_modules at runtime (electron + node built-ins stay external).
-    plugins: [externalizeDepsPlugin({ exclude: ['picomatch'] })],
+    // Bundle these into the main/worker output so the packaged app needs no
+    // node_modules at runtime (electron + node built-ins stay external).
+    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip'] })],
     build: {
       rollupOptions: {
         input: {

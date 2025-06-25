@@ -1,12 +1,14 @@
 import type { CompareOptions, CompareResult, ProgressUpdate, Side } from './types'
 import type { PersistedSettings } from './settings'
 import type { MergeAction } from './sync'
+import type { DiffPair, MergeArgs } from './git'
 
 // Channel names used across the IPC boundary, kept in one place.
 export const IPC = {
   selectFolder: 'dialog:selectFolder',
   selectFile: 'dialog:selectFile',
   compare: 'compare:run',
+  compareArchives: 'compare:archives',
   cancelCompare: 'compare:cancel',
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
@@ -16,6 +18,8 @@ export const IPC = {
   copyEntry: 'merge:copyEntry',
   deleteEntry: 'merge:deleteEntry',
   setFileTimes: 'fs:setFileTimes',
+  showInFolder: 'shell:showInFolder',
+  popupPathMenu: 'shell:pathMenu',
   makeMatch: 'merge:makeMatch',
   applyPlan: 'merge:applyPlan',
   setTheme: 'app:setTheme',
@@ -23,7 +27,12 @@ export const IPC = {
   saveSettings: 'settings:save',
   menuAction: 'menu:action', // main -> renderer (event)
   setWatch: 'watch:set',
-  watchChanged: 'watch:changed' // main -> renderer (event)
+  watchChanged: 'watch:changed', // main -> renderer (event)
+  getLaunchDiff: 'git:launchDiff',
+  getLaunchMerge: 'git:launchMerge',
+  getGitSetup: 'git:setup',
+  openDiff: 'git:openDiff', // main -> renderer (event)
+  openMerge: 'git:openMerge' // main -> renderer (event)
 } as const
 
 export interface CompareRequest {
@@ -70,6 +79,8 @@ export interface RendererApi {
   selectFolder(): Promise<string | null>
   selectFile(): Promise<string | null>
   compare(req: CompareRequest): Promise<CompareResult>
+  /** Compare the contents of two archive files (e.g. .zip) as a tree. */
+  compareArchives(leftPath: string, rightPath: string): Promise<CompareResult>
   cancelCompare(): Promise<void>
   onProgress(cb: (update: ProgressUpdate) => void): () => void
   readFile(path: string): Promise<FileContents>
@@ -81,6 +92,10 @@ export interface RendererApi {
   deleteEntry(req: DeleteRequest): Promise<void>
   /** Set a file's modification time (ms since epoch) without copying content. */
   setFileTimes(path: string, mtimeMs: number): Promise<void>
+  /** Reveal a path in the OS file manager. */
+  showInFolder(path: string): Promise<void>
+  /** Pop up a native context menu (Show in Explorer / Copy path) for a path. */
+  popupPathMenu(path: string): Promise<void>
   makeMatch(req: MakeMatchRequest): Promise<void>
   applyPlan(actions: MergeAction[], toTrash: boolean): Promise<void>
   setTheme(theme: 'light' | 'dark'): Promise<void>
@@ -92,4 +107,13 @@ export interface RendererApi {
   /** Watch these roots for changes (pass null/[] to stop). */
   setWatch(paths: string[] | null): Promise<void>
   onWatchChanged(cb: () => void): () => void
+  /** A `--git-diff` pair this process was launched with (difftool), or null. */
+  getLaunchDiff(): Promise<DiffPair | null>
+  /** git config commands to register Juxta as the difftool. */
+  getGitSetup(): Promise<string>
+  /** A diff pair forwarded from a second (difftool) launch. */
+  onOpenDiff(cb: (pair: DiffPair) => void): () => void
+  /** A `--git-merge` request this process was launched with (mergetool), or null. */
+  getLaunchMerge(): Promise<MergeArgs | null>
+  onOpenMerge(cb: (args: MergeArgs) => void): () => void
 }

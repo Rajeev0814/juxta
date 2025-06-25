@@ -13,10 +13,14 @@ import {
 import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch, type MergeAction } from '../core/merge'
 import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
 import { toHexDump } from '../core/hex'
+import { readZipEntries } from '../core/archive'
+import { compareEntryLists } from '../core/archiveCompare'
+import { DEFAULT_OPTIONS, type CompareResult } from '../shared/types'
 import { DEFAULT_SETTINGS, type PersistedSettings, type WindowBounds } from '../shared/settings'
 import { loadSettings, saveSettings } from './settings'
 import { CompareService } from './compareService'
 import { FolderWatcher } from './watchService'
+import { gitDiffToolCommands, gitMergeToolCommands, parseGitDiffArgs, parseGitMergeArgs } from '../shared/git'
 
 const isDev = !app.isPackaged
 /** Files above this size are not loaded into the diff editor. */
@@ -28,6 +32,27 @@ let mainWindow: BrowserWindow | null = null
 let settings: PersistedSettings = DEFAULT_SETTINGS
 const compareService = new CompareService(() => mainWindow)
 const folderWatcher = new FolderWatcher(() => mainWindow?.webContents.send(IPC.watchChanged))
+/** Diff pair / merge request this instance was launched with (git tools), if any. */
+const launchDiff = parseGitDiffArgs(process.argv)
+const launchMerge = parseGitMergeArgs(process.argv)
+
+// Single-instance: a second launch (e.g. git difftool on the next file) reuses
+// this window and opens the new pair as a tab instead of spawning a process.
+const gotSingleInstanceLock = app.requestSingleInstanceLock()
+if (!gotSingleInstanceLock) {
+  app.quit()
+} else {
+  app.on('second-instance', (_e, argv) => {
+    const pair = parseGitDiffArgs(argv)
+    const merge = parseGitMergeArgs(argv)
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+      if (merge) mainWindow.webContents.send(IPC.openMerge, merge)
+      else if (pair) mainWindow.webContents.send(IPC.openDiff, pair)
+    }
+  })
+}
 
 /** Clamp saved bounds onto the current display so the window is always visible. */
 function resolveBounds(saved: WindowBounds | null): WindowBounds {
@@ -124,6 +149,11 @@ function registerIpc(): void {
     compareService.cancel()
   })
 
+  ipcMain.handle(IPC.compareArchives, async (_e, leftPath: string, rightPath: string): Promise<CompareResult> => {
+    const { root, summary } = compareEntryLists(readZipEntries(leftPath), readZipEntries(rightPath))
+    return { leftRoot: leftPath, rightRoot: rightPath, options: DEFAULT_OPTIONS, root, summary, moves: [], elapsedMs: 0 }
+  })
+
   ipcMain.handle(IPC.setWatch, async (_e, paths: string[] | null) => {
     if (paths && paths.length) folderWatcher.watch(paths)
     else folderWatcher.close()
@@ -188,6 +218,18 @@ function registerIpc(): void {
     await utimes(path, t, t)
   })
 
+  ipcMain.handle(IPC.showInFolder, async (_e, path: string) => {
+    shell.showItemInFolder(path)
+  })
+
+  ipcMain.handle(IPC.popupPathMenu, async (_e, path: string) => {
+    const menu = Menu.buildFromTemplate([
+      { label: 'Show in Explorer', click: () => shell.showItemInFolder(path) },
+      { label: 'Copy path', click: () => clipboard.writeText(path) }
+    ])
+    menu.popup({ window: mainWindow ?? undefined })
+  })
+
   ipcMain.handle(IPC.makeMatch, async (_e, req: MakeMatchRequest) => {
     const plan = planMakeMatch(req.result.root, req.direction, req.result.leftRoot, req.result.rightRoot)
     await applyMergePlan(plan, { remove: (p) => removeEntry(p, req.toTrash) })
@@ -199,6 +241,13 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.setTheme, async (_e, theme: 'light' | 'dark') => {
     nativeTheme.themeSource = theme
+  })
+
+  ipcMain.handle(IPC.getLaunchDiff, async () => launchDiff)
+  ipcMain.handle(IPC.getLaunchMerge, async () => launchMerge)
+  ipcMain.handle(IPC.getGitSetup, async () => {
+    const exe = process.execPath
+    return `# Diff tool\n${gitDiffToolCommands(exe)}\n\n# Merge tool\n${gitMergeToolCommands(exe)}`
   })
 
   ipcMain.handle(IPC.loadSettings, async () => settings)

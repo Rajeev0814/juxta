@@ -4,6 +4,7 @@ import type { CompareNode } from '../../../shared/types'
 import { applyBlock, changedBlockIndices, computeBlocks, diffStats, toUnifiedDiff } from '../../../shared/blocks'
 import { languageForPath } from '../lib/language'
 import { juxtaTheme } from '../lib/monacoSetup'
+import { convertEol } from '../../../shared/eol'
 
 interface Props {
   node: CompareNode
@@ -33,6 +34,7 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
   const [inline, setInline] = useState(false)
   const [copied, setCopied] = useState(false)
   const [meta, setMeta] = useState({ encoding: '', leftEol: '', rightEol: '' })
+  const [eolChoice, setEolChoice] = useState<'keep' | 'lf' | 'crlf'>('keep')
 
   const editorRef = useRef<MonacoDiffEditor | null>(null)
 
@@ -140,12 +142,13 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
       const path = side === 'left' ? node.left?.path : node.right?.path
       const text = side === 'left' ? leftText : rightText
       if (!path || text === null) return
-      await window.api.writeFile(path, text)
+      const out = eolChoice === 'keep' ? text : convertEol(text, eolChoice)
+      await window.api.writeFile(path, out)
       if (side === 'left') setLeftDirty(false)
       else setRightDirty(false)
       onSaved?.()
     },
-    [node, leftText, rightText, onSaved]
+    [node, leftText, rightText, onSaved, eolChoice]
   )
 
   const onMount = (editor: MonacoDiffEditor): void => {
@@ -213,6 +216,16 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
           <button className={rightDirty ? 'primary' : ''} onClick={() => save('right')} disabled={!rightDirty} title="Save the right file">
             Save R
           </button>
+          <select
+            className="eol-select"
+            value={eolChoice}
+            onChange={(e) => setEolChoice(e.target.value as 'keep' | 'lf' | 'crlf')}
+            title="Line endings to write on save"
+          >
+            <option value="keep">EOL: keep</option>
+            <option value="lf">EOL: LF</option>
+            <option value="crlf">EOL: CRLF</option>
+          </select>
           <span className="fc-sep" />
           <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
             {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}

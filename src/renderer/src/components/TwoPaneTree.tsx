@@ -17,6 +17,10 @@ interface Props {
   onCopy: (node: CompareNode, direction: Side) => void
   onDelete: (node: CompareNode, side: Side) => void
   onCopyTime: (node: CompareNode, direction: Side) => void
+  /** Hide merge/delete/timestamp actions (e.g. archive contents). */
+  readOnly?: boolean
+  /** Right-click on a side: pop up Show-in-Explorer / Copy-path for that path. */
+  onContextMenu?: (path: string) => void
 }
 
 export function TwoPaneTree(props: Props): React.JSX.Element {
@@ -106,6 +110,8 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
                 onCopy={props.onCopy}
                 onDelete={props.onDelete}
                 onCopyTime={props.onCopyTime}
+                readOnly={props.readOnly}
+                onContextMenu={props.onContextMenu}
               />
             ))}
           </div>
@@ -124,9 +130,11 @@ interface RowProps {
   onCopy: (node: CompareNode, direction: Side) => void
   onDelete: (node: CompareNode, side: Side) => void
   onCopyTime: (node: CompareNode, direction: Side) => void
+  readOnly?: boolean
+  onContextMenu?: (path: string) => void
 }
 
-function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete, onCopyTime }: RowProps): React.JSX.Element {
+function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete, onCopyTime, readOnly, onContextMenu }: RowProps): React.JSX.Element {
   const { node, depth, hasChildren, expanded } = row
   const isDir = node.kind === 'directory'
 
@@ -150,7 +158,15 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
       onDoubleClick={() => !isDir && onOpenFile(node)}
     >
       {/* Left side */}
-      <div className={`pane-cell left ${node.left ? '' : 'absent'}`}>
+      <div
+        className={`pane-cell left ${node.left ? '' : 'absent'}`}
+        onContextMenu={(e) => {
+          if (node.left && onContextMenu) {
+            e.preventDefault()
+            onContextMenu(node.left.path)
+          }
+        }}
+      >
         <span className="indent" style={{ width: indent }} />
         <span className="chevron">{chevron}</span>
         {node.left ? (
@@ -172,17 +188,17 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
 
       {/* Center action gutter */}
       <div className="gutter" onClick={(e) => e.stopPropagation()}>
-        {node.left && (
+        {!readOnly && node.left && (
           <button className="act" title="Copy to right →" onClick={() => onCopy(node, 'left')}>
             →
           </button>
         )}
-        {node.right && (
+        {!readOnly && node.right && (
           <button className="act" title="← Copy to left" onClick={() => onCopy(node, 'right')}>
             ←
           </button>
         )}
-        {node.kind === 'file' && node.left && node.right && node.status === 'different' && (
+        {!readOnly && node.kind === 'file' && node.left && node.right && node.status === 'different' && (
           <>
             <button className="act" title="Copy left's timestamp to right" onClick={() => onCopyTime(node, 'left')}>
               🕓→
@@ -192,12 +208,12 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
             </button>
           </>
         )}
-        {node.status === 'leftOnly' && (
+        {!readOnly && node.status === 'leftOnly' && (
           <button className="act danger" title="Delete left orphan" onClick={() => onDelete(node, 'left')}>
             🗑
           </button>
         )}
-        {node.status === 'rightOnly' && (
+        {!readOnly && node.status === 'rightOnly' && (
           <button className="act danger" title="Delete right orphan" onClick={() => onDelete(node, 'right')}>
             🗑
           </button>
@@ -205,7 +221,15 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
       </div>
 
       {/* Right side */}
-      <div className={`pane-cell right ${node.right ? '' : 'absent'}`}>
+      <div
+        className={`pane-cell right ${node.right ? '' : 'absent'}`}
+        onContextMenu={(e) => {
+          if (node.right && onContextMenu) {
+            e.preventDefault()
+            onContextMenu(node.right.path)
+          }
+        }}
+      >
         <span className="indent" style={{ width: indent }} />
         <span className="chevron">{chevron}</span>
         {node.right ? (
