@@ -38,11 +38,15 @@ async function cachedHash(
   const ws = options.filters.ignoreWhitespace
   const ic = options.filters.ignoreCase
   const pattern = options.filters.ignoreLinePattern
+  const ignoreBlankLines = options.filters.ignoreBlankLines
   const normalizeJson = options.filters.normalizeJson
   const normalizeCsv = options.filters.normalizeCsv
+  const normalizeYaml = options.filters.normalizeYaml
   // The hash cache keys on ws/ic only, so bypass it when a content-transforming
-  // filter (line-ignore regex / JSON / CSV) is active to avoid stale hits.
-  const useCache = cache && !pattern && !normalizeJson && !normalizeCsv
+  // filter (line-ignore regex / blank lines / JSON / CSV / YAML) is active to
+  // avoid stale hits.
+  const useCache =
+    cache && !pattern && !ignoreBlankLines && !normalizeJson && !normalizeCsv && !normalizeYaml
   const hit = useCache ? cache.get(entry.path, entry.size, entry.mtimeMs, ws, ic) : undefined
   if (hit !== undefined) return hit
   try {
@@ -50,8 +54,10 @@ async function cachedHash(
       ignoreWhitespace: ws,
       ignoreCase: ic,
       ignoreLinePattern: pattern,
+      ignoreBlankLines,
       normalizeJson,
-      normalizeCsv
+      normalizeCsv,
+      normalizeYaml
     })
     if (useCache) cache.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
     return hash
@@ -149,6 +155,10 @@ export interface CompareEngineInput {
   cache?: HashCache
   /** Injectable clock for deterministic tests. */
   now?: () => number
+  /** Pre-walked entries for the left side (e.g. from a snapshot) — skips walking leftRoot. */
+  leftEntries?: WalkEntry[]
+  /** Pre-walked entries for the right side (e.g. from a snapshot) — skips walking rightRoot. */
+  rightEntries?: WalkEntry[]
 }
 
 /**
@@ -162,26 +172,33 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
   const startedAt = clock()
   const ignoreCase = options.filters.ignoreCase
 
-  // Each root applies its own .gitignore (when enabled), so the two sides can
-  // legitimately ignore different things.
+  // A side may be supplied pre-walked (e.g. from a snapshot); only load
+  // .gitignore / walk for sides that come from a live folder.
+  const needLeftWalk = !input.leftEntries
+  const needRightWalk = !input.rightEntries
   const [leftIgnore, rightIgnore] = options.filters.useGitignore
-    ? await Promise.all([loadGitignore(leftRoot), loadGitignore(rightRoot)])
+    ? await Promise.all([
+        needLeftWalk ? loadGitignore(leftRoot) : undefined,
+        needRightWalk ? loadGitignore(rightRoot) : undefined
+      ])
     : [undefined, undefined]
   const leftMatcher = createWalkMatcher(options.filters, leftIgnore)
   const rightMatcher = createWalkMatcher(options.filters, rightIgnore)
 
-  // --- Phase 1: walk both trees -------------------------------------------
+  // --- Phase 1: walk both trees (or use supplied entries) -----------------
   onProgress?.({ phase: 'walking', processed: 0, total: 0 })
   let walked = 0
   const [leftEntries, rightEntries] = await Promise.all([
-    walkTree(leftRoot, {
-      matcher: leftMatcher,
-      onEntry: (_c, p) => onProgress?.({ phase: 'walking', processed: ++walked, total: 0, currentPath: p })
-    }),
-    walkTree(rightRoot, {
-      matcher: rightMatcher,
-      onEntry: (_c, p) => onProgress?.({ phase: 'walking', processed: ++walked, total: 0, currentPath: p })
-    })
+    input.leftEntries ??
+      walkTree(leftRoot, {
+        matcher: leftMatcher,
+        onEntry: (_c, p) => onProgress?.({ phase: 'walking', processed: ++walked, total: 0, currentPath: p })
+      }),
+    input.rightEntries ??
+      walkTree(rightRoot, {
+        matcher: rightMatcher,
+        onEntry: (_c, p) => onProgress?.({ phase: 'walking', processed: ++walked, total: 0, currentPath: p })
+      })
   ])
 
   // --- Phase 2: merge the two listings by relative path --------------------
@@ -218,8 +235,10 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
         options.filters.ignoreWhitespace ||
         options.filters.ignoreCase ||
         !!options.filters.ignoreLinePattern ||
+        options.filters.ignoreBlankLines ||
         options.filters.normalizeJson ||
         options.filters.normalizeCsv ||
+        options.filters.normalizeYaml ||
         sizeMatch
       if (mustHash) {
         toHash.push(m.left, m.right)
@@ -228,7 +247,8 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
     const total = toHash.length
     let processed = 0
     await mapPool(toHash, 8, async (entry) => {
-      entry.hash = await cachedHash(entry, options, input.cache)
+      // Entries from a snapshot already carry a hash — don't touch the disk.
+      if (entry.hash === undefined) entry.hash = await cachedHash(entry, options, input.cache)
       onProgress?.({ phase: 'hashing', processed: ++processed, total, currentPath: entry.path })
     })
   }

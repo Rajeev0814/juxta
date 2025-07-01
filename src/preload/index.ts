@@ -13,6 +13,8 @@ import type { CompareResult, ProgressUpdate } from '../shared/types'
 const api: RendererApi = {
   selectFolder: () => ipcRenderer.invoke(IPC.selectFolder),
   selectFile: () => ipcRenderer.invoke(IPC.selectFile),
+  selectSnapshot: () => ipcRenderer.invoke(IPC.selectSnapshot),
+  saveSnapshot: (root, options) => ipcRenderer.invoke(IPC.saveSnapshot, root, options),
   compare: (req: CompareRequest): Promise<CompareResult> => ipcRenderer.invoke(IPC.compare, req),
   compareArchives: (leftPath: string, rightPath: string): Promise<CompareResult> =>
     ipcRenderer.invoke(IPC.compareArchives, leftPath, rightPath),
@@ -23,6 +25,8 @@ const api: RendererApi = {
     return () => ipcRenderer.removeListener(IPC.compareProgress, listener)
   },
   readFile: (path: string): Promise<FileContents> => ipcRenderer.invoke(IPC.readFile, path),
+  readImage: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.readImage, path),
+  readPdfText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readPdfText, path),
   writeFile: (path: string, text: string) => ipcRenderer.invoke(IPC.writeFile, path, text),
   writeClipboard: (text: string) => ipcRenderer.invoke(IPC.writeClipboard, text),
   saveText: (defaultName: string, content: string) => ipcRenderer.invoke(IPC.saveText, defaultName, content),

@@ -3,16 +3,29 @@ import { createReadStream } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { canonicalizeJson } from './json'
 import { canonicalizeCsv } from './csv'
+import { canonicalizeYaml } from './yaml'
 
 export interface HashOptions {
   ignoreWhitespace: boolean
   ignoreCase: boolean
   /** Drop lines matching this regex before hashing (empty/invalid = no-op). */
   ignoreLinePattern?: string
+  /** Drop blank (whitespace-only) lines before hashing. */
+  ignoreBlankLines?: boolean
   /** Canonicalize .json files (sorted keys, no whitespace) before hashing. */
   normalizeJson?: boolean
   /** Canonicalize .csv/.tsv files (sort data rows) before hashing. */
   normalizeCsv?: boolean
+  /** Canonicalize .yaml/.yml files (sorted keys, formatting-independent) before hashing. */
+  normalizeYaml?: boolean
+}
+
+/** Remove blank / whitespace-only lines. */
+export function stripBlankLines(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .join('\n')
 }
 
 /** Remove lines matching the given regex. Invalid regex / empty -> unchanged. */
@@ -64,9 +77,18 @@ export function hashFileRaw(filePath: string): Promise<string> {
 export async function hashFile(filePath: string, options: HashOptions): Promise<string> {
   const hasPattern = !!options.ignoreLinePattern
   const wantJson = !!options.normalizeJson && /\.json$/i.test(filePath)
+  const wantYaml = !!options.normalizeYaml && /\.ya?ml$/i.test(filePath)
   const csvDelimiter = /\.tsv$/i.test(filePath) ? '\t' : /\.csv$/i.test(filePath) ? ',' : null
   const wantCsv = !!options.normalizeCsv && csvDelimiter !== null
-  if (!options.ignoreWhitespace && !options.ignoreCase && !hasPattern && !wantJson && !wantCsv) {
+  if (
+    !options.ignoreWhitespace &&
+    !options.ignoreCase &&
+    !options.ignoreBlankLines &&
+    !hasPattern &&
+    !wantJson &&
+    !wantYaml &&
+    !wantCsv
+  ) {
     return hashFileRaw(filePath)
   }
   const buf = await readFile(filePath)
@@ -82,6 +104,15 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
     // Not valid JSON — fall through to the regular normalizers.
   }
 
+  if (wantYaml) {
+    const canonical = canonicalizeYaml(text)
+    if (canonical !== null) {
+      const out = options.ignoreCase ? canonical.toLowerCase() : canonical
+      return createHash('sha1').update(out).digest('hex')
+    }
+    // Not valid YAML — fall through to the regular normalizers.
+  }
+
   if (wantCsv && csvDelimiter !== null) {
     const canonical = canonicalizeCsv(text, { delimiter: csvDelimiter })
     const out = options.ignoreCase ? canonical.toLowerCase() : canonical
@@ -89,6 +120,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
   }
 
   if (hasPattern) text = dropIgnoredLines(text, options.ignoreLinePattern)
+  if (options.ignoreBlankLines) text = stripBlankLines(text)
   if (options.ignoreWhitespace) text = normalizeText(text)
   if (options.ignoreCase) text = text.toLowerCase()
   return createHash('sha1').update(text).digest('hex')

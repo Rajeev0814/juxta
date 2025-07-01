@@ -34,10 +34,14 @@ export interface FilterOptions {
   useGitignore: boolean
   /** Lines matching this regex are ignored when comparing file content. */
   ignoreLinePattern: string
+  /** Ignore blank / whitespace-only lines when comparing file content. */
+  ignoreBlankLines: boolean
   /** Compare .json files by canonical form (ignore formatting & key order). */
   normalizeJson: boolean
   /** Compare .csv/.tsv files ignoring data-row order. */
   normalizeCsv: boolean
+  /** Compare .yaml/.yml files by canonical form (ignore formatting & key order). */
+  normalizeYaml: boolean
 }
 
 export interface CompareOptions {
@@ -110,8 +114,10 @@ export const DEFAULT_FILTERS: FilterOptions = {
   ignoreCase: false,
   useGitignore: false,
   ignoreLinePattern: '',
+  ignoreBlankLines: false,
   normalizeJson: false,
-  normalizeCsv: false
+  normalizeCsv: false,
+  normalizeYaml: false
 }
 
 export const DEFAULT_OPTIONS: CompareOptions = {

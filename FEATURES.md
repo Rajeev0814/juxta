@@ -17,19 +17,19 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - 🟦 B2. 3-way merge — ✅ diff3 auto-merge core + mergetool view (conflict nav, save); ⬜ folder 3-way, in-pane resolve buttons
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ✅ B4. Moved / renamed detection (match by content hash)
-- 🟦 B5. Ignore-lines-by-regex (✅ content hashing); ⬜ per-file-type rule sets
+- 🟦 B5. Ignore-lines — ✅ by-regex + ignore-blank-lines (content hashing); ⬜ per-file-type rule sets
 - ✅ B6. Encoding & line-ending — detect UTF-8/UTF-16 + EOL, fix UTF-16 decode, convert EOL (LF/CRLF) on save
-- 🟦 B7. Reports & patch — ✅ unified-diff "Copy patch", ✅ HTML report export; ⬜ apply-patch
-- ⬜ B8. Snapshots (capture + compare against)
+- ✅ B7. Reports & patch — unified-diff "Copy patch" + "Save .patch" + "Apply patch", HTML + CSV report export
+- ✅ B8. Snapshots — capture a folder to a `.juxtasnap` file; compare a live folder (or another snapshot) against it offline
 - ✅ B9. Timestamp operations (copy mtime across without copying content)
 
 ## C. Specialized comparators
-- ⬜ C1. Image compare (side-by-side, overlay, swipe, pixel diff)
+- ✅ C1. Image compare — side-by-side, opacity overlay, swipe, pixel-diff heatmap + diff %
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
 - 🟦 C3. Table compare — ✅ CSV/TSV-aware (ignore row order); ⬜ key-column-aligned table view
-- 🟦 C4. Structured data — ✅ JSON-aware compare (ignore formatting/key order); ⬜ YAML/XML, key-aligned diff view
+- 🟦 C4. Structured data — ✅ JSON- & YAML-aware compare (ignore formatting/key order); ⬜ XML, key-aligned diff view
 - ⬜ C5. AST / semantic code diff
-- ⬜ C6. Document text compare (PDF / Office)
+- 🟦 C6. Document text compare — ✅ PDF text-diff (auto-detected, extracted via pdf-parse); ⬜ Office (docx/xlsx)
 - 🟦 C7. Archive browsing — ✅ compare two .zip-family archives as a content tree; ⬜ tar/gz, drill into entries, browse archive vs folder
 
 ## D. Remote & integration

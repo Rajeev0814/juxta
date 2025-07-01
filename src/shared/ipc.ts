@@ -7,11 +7,15 @@ import type { DiffPair, MergeArgs } from './git'
 export const IPC = {
   selectFolder: 'dialog:selectFolder',
   selectFile: 'dialog:selectFile',
+  selectSnapshot: 'dialog:selectSnapshot',
+  saveSnapshot: 'snapshot:save',
   compare: 'compare:run',
   compareArchives: 'compare:archives',
   cancelCompare: 'compare:cancel',
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
+  readImage: 'fs:readImage',
+  readPdfText: 'fs:readPdfText',
   writeFile: 'fs:writeFile',
   saveText: 'fs:saveText',
   writeClipboard: 'clipboard:write',
@@ -78,12 +82,20 @@ export interface FileContents {
 export interface RendererApi {
   selectFolder(): Promise<string | null>
   selectFile(): Promise<string | null>
+  /** Pick an existing .juxtasnap snapshot file to use as a comparison side. */
+  selectSnapshot(): Promise<string | null>
+  /** Capture a folder to a snapshot file; returns the saved path or null if cancelled. */
+  saveSnapshot(root: string, options: CompareOptions): Promise<string | null>
   compare(req: CompareRequest): Promise<CompareResult>
   /** Compare the contents of two archive files (e.g. .zip) as a tree. */
   compareArchives(leftPath: string, rightPath: string): Promise<CompareResult>
   cancelCompare(): Promise<void>
   onProgress(cb: (update: ProgressUpdate) => void): () => void
   readFile(path: string): Promise<FileContents>
+  /** Read an image file as a data: URL (or null if too large / unreadable). */
+  readImage(path: string): Promise<string | null>
+  /** Extract the plain text of a PDF file for text-level comparison. */
+  readPdfText(path: string): Promise<string>
   writeFile(path: string, text: string): Promise<void>
   writeClipboard(text: string): Promise<void>
   /** Prompt for a save location and write text; returns the path or null if cancelled. */

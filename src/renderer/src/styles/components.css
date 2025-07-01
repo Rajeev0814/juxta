@@ -207,6 +207,20 @@
   text-align: center;
   color: var(--text-dim);
 }
+.empty-hint {
+  margin-top: 18px;
+  font-size: 12px;
+  line-height: 1.9;
+  text-align: left;
+  display: inline-block;
+  padding: 10px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+.empty-hint b {
+  color: var(--text);
+}
 .banner.error,
 .fc-message.error {
   color: var(--st-right-only);
@@ -435,6 +449,134 @@
 .fc-message {
   padding: 20px;
   color: var(--text-dim);
+}
+
+/* ---------- Image compare ---------- */
+.image-compare {
+  overflow: auto;
+  background: var(--bg-panel);
+}
+.img-side {
+  display: flex;
+  gap: 1px;
+  min-height: 100%;
+}
+.img-side .img-pane {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10px;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+}
+.img-side img,
+.img-overlay img,
+.img-diff canvas {
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  background: repeating-conic-gradient(#808080 0% 25%, #a0a0a0 0% 50%) 50% / 16px 16px;
+}
+.img-overlay {
+  position: relative;
+  padding: 10px;
+  display: inline-block;
+}
+.img-overlay img {
+  display: block;
+}
+.img-overlay img:last-child {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+.img-diff {
+  padding: 10px;
+}
+.img-swipe {
+  position: relative;
+  display: inline-block;
+  padding: 10px;
+}
+.img-swipe img {
+  display: block;
+}
+.img-swipe img.swipe-top {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+}
+.img-swipe .swipe-divider {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+/* ---------- Modal / shortcuts help ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.modal {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  min-width: 360px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+}
+.modal-close {
+  width: 24px;
+  height: 22px;
+  padding: 0;
+}
+.shortcuts-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 13px;
+}
+.shortcuts-table td {
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.shortcuts-table tr:last-child td {
+  border-bottom: none;
+}
+.sc-keys {
+  white-space: nowrap;
+}
+.sc-or {
+  color: var(--text-dim);
+}
+.sc-action {
+  color: var(--text-dim);
+}
+.shortcuts-table kbd {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
 }
 
 /* ---------- Status bar ---------- */

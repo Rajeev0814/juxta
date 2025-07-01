@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { compareFolders } from '../src/core/compare'
-import { ancestorsOf, listChangedFiles } from '../src/shared/nav'
+import { ancestorsOf, collectDirRelPaths, listChangedFiles } from '../src/shared/nav'
 import { DEFAULT_FILTERS, type CompareOptions } from '../src/shared/types'
 import { makeTree } from './helpers'
 
@@ -32,6 +32,13 @@ describe('listChangedFiles', () => {
     // a/deep.txt (left-only), b/diff.txt (different), then root files
     expect(changed).toEqual(['a/deep.txt', 'b/diff.txt', 'top-left.txt', 'top-right.txt'])
     expect(changed).not.toContain('a/same.txt')
+  })
+
+  it('collects all directory relPaths (nested), excluding the root and files', async () => {
+    const left = await makeTree({ 'a/b/c.txt': 'x', 'a/d.txt': 'y', 'top.txt': 'z' })
+    const right = await makeTree({ 'a/b/c.txt': 'x2' })
+    const res = await compareFolders({ leftRoot: left, rightRoot: right, options })
+    expect(collectDirRelPaths(res.root).sort()).toEqual(['a', 'a/b'])
   })
 
   it('returns an empty list when trees are identical', async () => {

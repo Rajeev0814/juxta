@@ -24,8 +24,8 @@ function fmtSize(n: number | undefined): string {
   return `${v.toFixed(v < 10 ? 1 : 0)} ${u[i]}`
 }
 
-/** Generate a self-contained HTML report of a folder comparison. Pure. */
-export function toHtmlReport(result: CompareResult): string {
+/** Collect every changed (non-identical) file node, depth-first. */
+function collectChangedFiles(result: CompareResult): CompareNode[] {
   const changed: CompareNode[] = []
   const visit = (node: CompareNode): void => {
     for (const child of node.children ?? []) {
@@ -34,6 +34,28 @@ export function toHtmlReport(result: CompareResult): string {
     }
   }
   visit(result.root)
+  return changed
+}
+
+/** Quote a value for CSV (RFC 4180) when it contains a comma, quote or newline. */
+function csvCell(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value
+}
+
+/** Generate a CSV of the changed files in a folder comparison. Pure. */
+export function toCsvReport(result: CompareResult): string {
+  const header = ['Path', 'Status', 'Left size', 'Right size']
+  const rows = collectChangedFiles(result).map((n) =>
+    [n.relPath, STATUS_LABEL[n.status], n.left?.size ?? '', n.right?.size ?? '']
+      .map((c) => csvCell(String(c)))
+      .join(',')
+  )
+  return [header.join(','), ...rows].join('\r\n')
+}
+
+/** Generate a self-contained HTML report of a folder comparison. Pure. */
+export function toHtmlReport(result: CompareResult): string {
+  const changed = collectChangedFiles(result)
 
   const s = result.summary
   const rows = changed

@@ -2,9 +2,10 @@
 // object key order compare as identical. Array order is preserved (it's
 // semantically significant). Returns null when the text isn't valid JSON.
 
-type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
+export type Json = null | boolean | number | string | Json[] | { [k: string]: Json }
 
-function sortKeys(value: Json): Json {
+/** Recursively sort object keys (arrays keep their order — it's significant). */
+export function sortKeys(value: Json): Json {
   if (Array.isArray(value)) return value.map(sortKeys)
   if (value !== null && typeof value === 'object') {
     const out: { [k: string]: Json } = {}
