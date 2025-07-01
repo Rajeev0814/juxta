@@ -17,6 +17,21 @@ export function listChangedFiles(root: CompareNode): string[] {
   return out
 }
 
+/** All directory relPaths in the tree (for "expand all"). */
+export function collectDirRelPaths(root: CompareNode): string[] {
+  const out: string[] = []
+  const visit = (node: CompareNode): void => {
+    for (const child of node.children ?? []) {
+      if (child.kind === 'directory') {
+        out.push(child.relPath)
+        visit(child)
+      }
+    }
+  }
+  visit(root)
+  return out
+}
+
 /** Ancestor directory relPaths of a path, root-first: 'a/b/c.txt' -> ['a', 'a/b']. */
 export function ancestorsOf(relPath: string): string[] {
   const parts = relPath.split('/')

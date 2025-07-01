@@ -14,8 +14,10 @@ import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch, type MergeAction
 import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
 import { toHexDump } from '../core/hex'
 import { readZipEntries } from '../core/archive'
+import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { compareEntryLists } from '../core/archiveCompare'
-import { DEFAULT_OPTIONS, type CompareResult } from '../shared/types'
+import { DEFAULT_OPTIONS, type CompareOptions, type CompareResult } from '../shared/types'
+import { SNAPSHOT_EXT } from '../shared/snapshot'
 import { DEFAULT_SETTINGS, type PersistedSettings, type WindowBounds } from '../shared/settings'
 import { loadSettings, saveSettings } from './settings'
 import { CompareService } from './compareService'
@@ -141,6 +143,30 @@ function registerIpc(): void {
     return result.filePaths[0]
   })
 
+  ipcMain.handle(IPC.selectSnapshot, async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Juxta snapshot', extensions: ['juxtasnap'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    return result.filePaths[0]
+  })
+
+  ipcMain.handle(
+    IPC.saveSnapshot,
+    async (_e, root: string, options: CompareOptions): Promise<string | null> => {
+      const snapshot = await compareService.capture(root, options)
+      const base = root.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'folder'
+      const result = await dialog.showSaveDialog(mainWindow!, {
+        defaultPath: `${base}${SNAPSHOT_EXT}`,
+        filters: [{ name: 'Juxta snapshot', extensions: ['juxtasnap'] }]
+      })
+      if (result.canceled || !result.filePath) return null
+      await writeFile(result.filePath, JSON.stringify(snapshot), 'utf8')
+      return result.filePath
+    }
+  )
+
   ipcMain.handle(IPC.compare, async (_e, req: CompareRequest) => {
     return compareService.compare(req.leftRoot, req.rightRoot, req.options)
   })
@@ -190,6 +216,26 @@ function registerIpc(): void {
     }
   })
 
+  ipcMain.handle(IPC.readImage, async (_e, path: string): Promise<string | null> => {
+    try {
+      const info = await stat(path)
+      if (info.size > MAX_DIFF_FILE_BYTES) return null
+      const buf = await readFile(path)
+      const ext = path.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? 'png'
+      const mime =
+        ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'ico' ? 'image/x-icon' : `image/${ext}`
+      return `data:${mime};base64,${buf.toString('base64')}`
+    } catch {
+      return null
+    }
+  })
+
+  ipcMain.handle(IPC.readPdfText, async (_e, path: string): Promise<string> => {
+    const buf = await readFile(path)
+    const data = await pdfParse(buf)
+    return data.text
+  })
+
   ipcMain.handle(IPC.writeFile, async (_e, path: string, text: string) => {
     await writeFile(path, text, 'utf8')
   })
@@ -224,6 +270,7 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.popupPathMenu, async (_e, path: string) => {
     const menu = Menu.buildFromTemplate([
+      { label: 'Open in default app', click: () => void shell.openPath(path) },
       { label: 'Show in Explorer', click: () => shell.showItemInFolder(path) },
       { label: 'Copy path', click: () => clipboard.writeText(path) }
     ])

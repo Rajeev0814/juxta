@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode, CompareResult, Side } from '../../shared/types'
 import { listChangedFiles } from '../../shared/nav'
 import { planSync, planTimestamp, type SyncMode } from '../../shared/sync'
-import { toHtmlReport } from '../../shared/report'
+import { toHtmlReport, toCsvReport } from '../../shared/report'
 import type { CompareProfile } from '../../shared/settings'
 import {
   createSession,
@@ -19,7 +19,12 @@ import { FileCompare } from './components/FileCompare'
 import { TextCompare } from './components/TextCompare'
 import { MergeView } from './components/MergeView'
 import { ArchiveCompareView } from './components/ArchiveCompareView'
+import { ImageCompareView } from './components/ImageCompareView'
+import { PdfCompareView } from './components/PdfCompareView'
+import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { isArchivePath } from '../../shared/archive'
+import { isImagePath } from '../../shared/image'
+import { isPdfPath } from '../../shared/pdf'
 import type { MergeArgs } from '../../shared/git'
 import { StatusBar } from './components/StatusBar'
 import { useCompare } from './hooks/useCompare'
@@ -53,7 +58,10 @@ export default function App(): React.JSX.Element {
   const [view, setView] = useState<'folder' | 'file'>('folder')
   const [activeNode, setActiveNode] = useState<CompareNode | null>(null)
   const [selectedRelPath, setSelectedRelPath] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [showHelp, setShowHelp] = useState(false)
   const [reveal, setReveal] = useState<{ relPath: string; nonce: number } | null>(null)
+  const [expandSignal, setExpandSignal] = useState<{ mode: 'all' | 'none' | 'default'; nonce: number } | null>(null)
   const navPosRef = useRef(-1)
 
   const { comparing, progress, error, run, cancel } = useCompare()
@@ -192,6 +200,25 @@ export default function App(): React.JSX.Element {
       rightText: active.leftText
     })
   }, [active, updateActive])
+
+  const handleSnapshot = useCallback(
+    async (action: 'save:left' | 'save:right' | 'open:left' | 'open:right') => {
+      const [op, side] = action.split(':') as ['save' | 'open', 'left' | 'right']
+      if (op === 'save') {
+        const root = side === 'left' ? active.leftRoot : active.rightRoot
+        if (!root) return
+        const saved = await window.api.saveSnapshot(root, active.options)
+        if (saved) {
+          setNotice(`Snapshot saved: ${saved}`)
+          setTimeout(() => setNotice(null), 4000)
+        }
+      } else {
+        const picked = await window.api.selectSnapshot()
+        if (picked) updateActive(side === 'left' ? { leftRoot: picked } : { rightRoot: picked })
+      }
+    },
+    [active.leftRoot, active.rightRoot, active.options, updateActive]
+  )
 
   const applyProfile = useCallback(
     (name: string) => {
@@ -393,18 +420,30 @@ export default function App(): React.JSX.Element {
   // --- In-editor keyboard shortcuts (F4/F5 owned by the menu) --------------
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      const typing =
+        !!target &&
+        (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
       if (e.key === 'F6') {
         e.preventDefault()
         if (mergeRequest || view === 'file' || active.type === 'files' || active.type === 'text')
           (e.shiftKey ? navRef.current?.prev : navRef.current?.next)?.()
-      } else if (e.key === 'Escape' && view === 'file') {
+      } else if (e.key === '?' && !typing) {
         e.preventDefault()
-        setView('folder')
+        setShowHelp((v) => !v)
+      } else if (e.key === 'Escape') {
+        if (showHelp) {
+          e.preventDefault()
+          setShowHelp(false)
+        } else if (view === 'file') {
+          e.preventDefault()
+          setView('folder')
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [view, active.type, mergeRequest])
+  }, [view, active.type, mergeRequest, showHelp])
 
   const directNode = useMemo<CompareNode | null>(() => {
     if (active.type !== 'files') return null
@@ -476,6 +515,9 @@ export default function App(): React.JSX.Element {
         </div>
 
         <span className="tab-spacer" />
+        <button className="theme-btn" onClick={() => setShowHelp(true)} title="Keyboard shortcuts (?)">
+          ?
+        </button>
         <button className="theme-btn" onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}>
           {theme === 'dark' ? '☀' : '☾'}
         </button>
@@ -494,10 +536,12 @@ export default function App(): React.JSX.Element {
             onOptions={(o) => updateActive({ options: o })}
             onCompare={() => void runCompare()}
             onCancel={cancel}
+            onSwap={swapSides}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             profiles={profiles}
             onApplyProfile={applyProfile}
             onSaveProfile={saveProfile}
+            onSnapshot={handleSnapshot}
           />
 
           {result && view === 'folder' && (
@@ -509,6 +553,18 @@ export default function App(): React.JSX.Element {
                 ↧ Next diff
               </button>
               <span className="nav-count">{navList.length} changed</span>
+              <button
+                onClick={() => setExpandSignal((s) => ({ mode: 'all', nonce: (s?.nonce ?? 0) + 1 }))}
+                title="Expand all folders"
+              >
+                ⊞ Expand
+              </button>
+              <button
+                onClick={() => setExpandSignal((s) => ({ mode: 'none', nonce: (s?.nonce ?? 0) + 1 }))}
+                title="Collapse all folders"
+              >
+                ⊟ Collapse
+              </button>
               <label className="mb-toggle" title="Re-compare automatically when files change">
                 <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
                 👁 Live
@@ -543,12 +599,21 @@ export default function App(): React.JSX.Element {
               >
                 ⤓ Report
               </button>
+              <button
+                onClick={() => {
+                  if (result) void window.api.saveText('juxta-report.csv', toCsvReport(result))
+                }}
+                title="Export the changed files as CSV"
+              >
+                ⤓ CSV
+              </button>
               <span className="hint">F4 next diff · F5 re-compare · double-click a file to diff</span>
             </div>
           )}
 
           <div className="app-body">
             {error && <div className="banner error">Comparison failed: {error}</div>}
+            {notice && <div className="banner">{notice}</div>}
             {!result && !comparing && (
               <div className="empty-state">
                 <h2>Folder Compare</h2>
@@ -562,6 +627,7 @@ export default function App(): React.JSX.Element {
                 hideIdentical={hideIdentical}
                 selectedRelPath={selectedRelPath}
                 reveal={reveal}
+                expandSignal={expandSignal}
                 onSelect={(n) => setSelectedRelPath(n.relPath)}
                 onOpenFile={openFile}
                 onCopy={onCopy}
@@ -597,6 +663,18 @@ export default function App(): React.JSX.Element {
           <div className="app-body">
             {active.leftFile && active.rightFile && isArchivePath(active.leftFile) && isArchivePath(active.rightFile) ? (
               <ArchiveCompareView left={active.leftFile} right={active.rightFile} hideIdentical={hideIdentical} />
+            ) : active.leftFile && active.rightFile && isImagePath(active.leftFile) && isImagePath(active.rightFile) ? (
+              <ImageCompareView left={active.leftFile} right={active.rightFile} />
+            ) : active.leftFile && active.rightFile && isPdfPath(active.leftFile) && isPdfPath(active.rightFile) ? (
+              <PdfCompareView
+                key={`${active.id}:${active.leftFile}|${active.rightFile}`}
+                left={active.leftFile}
+                right={active.rightFile}
+                theme={theme}
+                registerNav={(nav) => {
+                  navRef.current = nav
+                }}
+              />
             ) : directNode ? (
               <FileCompare
                 key={`${active.id}:${active.leftFile}|${active.rightFile}`}
@@ -612,6 +690,17 @@ export default function App(): React.JSX.Element {
               <div className="empty-state">
                 <h2>File Compare</h2>
                 <p>Pick two files above (or drag them in) to see a side-by-side diff.</p>
+                <p className="empty-hint">
+                  The right comparator is chosen automatically from the file types:
+                  <br />
+                  🖼 <b>images</b> (png/jpg/gif/webp…) → side-by-side, overlay, swipe &amp; pixel-diff
+                  <br />
+                  📄 <b>PDFs</b> → extracted-text diff
+                  <br />
+                  🗜 <b>archives</b> (zip/jar…) → content-tree compare
+                  <br />
+                  📝 anything else → text / hex diff
+                </p>
               </div>
             )}
           </div>
@@ -643,6 +732,8 @@ export default function App(): React.JSX.Element {
         useTrash={useTrash}
         onToggleTrash={setUseTrash}
       />
+
+      {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
     </div>
   )
 }

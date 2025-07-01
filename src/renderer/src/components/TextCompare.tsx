@@ -9,6 +9,7 @@ import {
   diffStats,
   toUnifiedDiff
 } from '../../../shared/blocks'
+import { applyUnifiedDiff } from '../../../shared/patch'
 import { juxtaTheme } from '../lib/monacoSetup'
 
 interface Props {
@@ -52,6 +53,7 @@ export function TextCompare({
   // so wrapping side-by-side would be asymmetric.
   const [inline, setInline] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [patchNote, setPatchNote] = useState<string | null>(null)
 
   const gotoDiff = useCallback((dir: 1 | -1): void => {
     const editor = editorRef.current
@@ -125,16 +127,55 @@ export function TextCompare({
     setEditorText(right, lv)
   }, [])
 
-  const copyPatch = useCallback((): void => {
+  const buildPatch = useCallback((): string | null => {
     const editor = editorRef.current
-    if (!editor) return
+    if (!editor) return null
     const lt = editor.getOriginalEditor().getModel()?.getValue() ?? ''
     const rt = editor.getModifiedEditor().getModel()?.getValue() ?? ''
-    const patch = toUnifiedDiff(lt, rt, { oldPath: 'left', newPath: 'right' })
+    return toUnifiedDiff(lt, rt, { oldPath: 'left', newPath: 'right' }) || null
+  }, [])
+
+  const copyPatch = useCallback((): void => {
+    const patch = buildPatch()
     if (!patch) return
     void window.api.writeClipboard(patch)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
+  }, [buildPatch])
+
+  const savePatch = useCallback((): void => {
+    const patch = buildPatch()
+    if (!patch) return
+    void window.api.saveText('text-compare.patch', patch)
+  }, [buildPatch])
+
+  // Apply a chosen .patch file to the left text, showing the result on the right.
+  const applyPatch = useCallback(async (): Promise<void> => {
+    const editor = editorRef.current
+    if (!editor) return
+    const path = await window.api.selectFile()
+    if (!path) return
+    const file = await window.api.readFile(path)
+    const flash = (msg: string): void => {
+      setPatchNote(msg)
+      setTimeout(() => setPatchNote(null), 4000)
+    }
+    if (file.binary || file.tooLarge) {
+      flash('Not a readable patch file')
+      return
+    }
+    const left = editor.getOriginalEditor().getModel()?.getValue() ?? ''
+    const result = applyUnifiedDiff(left, file.text)
+    if (!result) {
+      flash('Not a valid unified diff')
+      return
+    }
+    setEditorText(editor.getModifiedEditor(), result.text)
+    flash(
+      result.failed > 0
+        ? `Applied ${result.applied}/${result.hunks} hunks (${result.failed} didn’t match)`
+        : `Applied ${result.applied} hunk${result.applied === 1 ? '' : 's'} → right`
+    )
   }, [])
 
   const clear = useCallback((): void => {
@@ -148,7 +189,7 @@ export function TextCompare({
     <div className="file-compare">
       <div className="file-compare-bar">
         <span className="fc-name">Text Compare</span>
-        <span className="fc-hint">Paste or type into each side — the diff updates live</span>
+        <span className="fc-hint">{patchNote ?? 'Paste or type into each side — the diff updates live'}</span>
         <div className="fc-actions">
           <span className="fc-count" title="Changed sections">{count}</span>
           {(stats.added > 0 || stats.removed > 0) && (
@@ -175,6 +216,12 @@ export function TextCompare({
           </button>
           <button onClick={copyPatch} disabled={count === 0} title="Copy a unified diff (patch) to the clipboard">
             {copied ? '✓ Copied' : '⎘ Patch'}
+          </button>
+          <button onClick={savePatch} disabled={count === 0} title="Save a unified diff (patch) to a .patch file">
+            ⤓ Patch
+          </button>
+          <button onClick={() => void applyPatch()} title="Apply a .patch file to the left; result shows on the right">
+            ⇊ Apply patch
           </button>
           <button onClick={swap} title="Swap the two sides">
             ⇄ Swap

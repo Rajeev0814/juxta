@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { join } from 'node:path'
-import { dropIgnoredLines, hashFile, hashFileRaw, normalizeText } from '../src/core/hash'
+import { dropIgnoredLines, hashFile, hashFileRaw, normalizeText, stripBlankLines } from '../src/core/hash'
 import { makeTree } from './helpers'
 
 describe('normalizeText', () => {
@@ -22,6 +22,12 @@ describe('dropIgnoredLines', () => {
   })
 })
 
+describe('stripBlankLines', () => {
+  it('drops blank and whitespace-only lines, keeps the rest', () => {
+    expect(stripBlankLines('a\n\nb\n   \nc')).toBe('a\nb\nc')
+  })
+})
+
 describe('hashFile', () => {
   it('produces equal raw hashes for byte-identical files', async () => {
     const root = await makeTree({ 'a.txt': 'content', 'b.txt': 'content' })
@@ -34,6 +40,22 @@ describe('hashFile', () => {
     const root = await makeTree({ 'a.txt': 'x  y', 'b.txt': 'x y' })
     const ha = await hashFile(join(root, 'a.txt'), { ignoreWhitespace: true, ignoreCase: false })
     const hb = await hashFile(join(root, 'b.txt'), { ignoreWhitespace: true, ignoreCase: false })
+    expect(ha).toBe(hb)
+  })
+
+  it('hashes blank-line-different files equally when ignoreBlankLines is set', async () => {
+    const root = await makeTree({ 'a.txt': 'x\n\n\ny', 'b.txt': 'x\ny' })
+    const opts = { ignoreWhitespace: false, ignoreCase: false, ignoreBlankLines: true }
+    const ha = await hashFile(join(root, 'a.txt'), opts)
+    const hb = await hashFile(join(root, 'b.txt'), opts)
+    expect(ha).toBe(hb)
+  })
+
+  it('canonicalizes .yaml files when normalizeYaml is set (key order ignored)', async () => {
+    const root = await makeTree({ 'a.yaml': 'b: 1\na: 2\n', 'b.yaml': 'a: 2\nb: 1\n' })
+    const opts = { ignoreWhitespace: false, ignoreCase: false, normalizeYaml: true }
+    const ha = await hashFile(join(root, 'a.yaml'), opts)
+    const hb = await hashFile(join(root, 'b.yaml'), opts)
     expect(ha).toBe(hb)
   })
 })

@@ -155,17 +155,29 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
     editorRef.current = editor
   }
 
+  const buildPatch = useCallback((): string | null => {
+    if (leftText === null || rightText === null) return null
+    return (
+      toUnifiedDiff(leftText, rightText, {
+        oldPath: node.left?.path ?? node.name,
+        newPath: node.right?.path ?? node.name
+      }) || null
+    )
+  }, [leftText, rightText, node])
+
   const copyPatch = useCallback((): void => {
-    if (leftText === null || rightText === null) return
-    const patch = toUnifiedDiff(leftText, rightText, {
-      oldPath: node.left?.path ?? node.name,
-      newPath: node.right?.path ?? node.name
-    })
+    const patch = buildPatch()
     if (!patch) return
     void window.api.writeClipboard(patch)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
-  }, [leftText, rightText, node])
+  }, [buildPatch])
+
+  const savePatch = useCallback((): void => {
+    const patch = buildPatch()
+    if (!patch) return
+    void window.api.saveText(`${node.name}.patch`, patch)
+  }, [buildPatch, node])
 
   const loaded = leftText !== null && rightText !== null
   const language = languageForPath(node.left?.path ?? node.right?.path ?? '')
@@ -232,6 +244,9 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
           </button>
           <button onClick={copyPatch} disabled={!loaded || binary || tooLarge} title="Copy a unified diff (patch) to the clipboard">
             {copied ? '✓ Copied' : '⎘ Patch'}
+          </button>
+          <button onClick={savePatch} disabled={!loaded || binary || tooLarge} title="Save a unified diff (patch) to a .patch file">
+            ⤓ Patch
           </button>
           <span className="fc-sep" />
           <button onClick={onClose} title="Back (Esc)">

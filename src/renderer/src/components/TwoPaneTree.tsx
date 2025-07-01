@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode, CompareResult, Side } from '../../../shared/types'
-import { ancestorsOf } from '../../../shared/nav'
+import { ancestorsOf, collectDirRelPaths } from '../../../shared/nav'
 import { defaultExpanded, flatten, formatSize, formatTime, statusClass } from '../lib/treeUtils'
 
 const ROW_H = 24
@@ -12,6 +12,8 @@ interface Props {
   selectedRelPath: string | null
   /** When set, expand ancestors and scroll this relPath into view. */
   reveal: { relPath: string; nonce: number } | null
+  /** Expand-all / collapse-all / restore-default command. */
+  expandSignal?: { mode: 'all' | 'none' | 'default'; nonce: number } | null
   onSelect: (node: CompareNode) => void
   onOpenFile: (node: CompareNode) => void
   onCopy: (node: CompareNode, direction: Side) => void
@@ -64,6 +66,16 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reveal])
+
+  // Expand-all / collapse-all / restore-default.
+  const expandSignal = props.expandSignal
+  useEffect(() => {
+    if (!expandSignal) return
+    if (expandSignal.mode === 'all') setExpanded(new Set(collectDirRelPaths(result.root)))
+    else if (expandSignal.mode === 'none') setExpanded(new Set())
+    else setExpanded(defaultExpanded(result.root))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandSignal])
 
   const total = rows.length
   const start = Math.max(0, Math.floor(scrollTop / ROW_H) - OVERSCAN)

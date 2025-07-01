@@ -69,8 +69,10 @@ function coerceFilters(raw: unknown): FilterOptions {
     ignoreCase: typeof raw.ignoreCase === 'boolean' ? raw.ignoreCase : d.ignoreCase,
     useGitignore: typeof raw.useGitignore === 'boolean' ? raw.useGitignore : d.useGitignore,
     ignoreLinePattern: typeof raw.ignoreLinePattern === 'string' ? raw.ignoreLinePattern : d.ignoreLinePattern,
+    ignoreBlankLines: typeof raw.ignoreBlankLines === 'boolean' ? raw.ignoreBlankLines : d.ignoreBlankLines,
     normalizeJson: typeof raw.normalizeJson === 'boolean' ? raw.normalizeJson : d.normalizeJson,
-    normalizeCsv: typeof raw.normalizeCsv === 'boolean' ? raw.normalizeCsv : d.normalizeCsv
+    normalizeCsv: typeof raw.normalizeCsv === 'boolean' ? raw.normalizeCsv : d.normalizeCsv,
+    normalizeYaml: typeof raw.normalizeYaml === 'boolean' ? raw.normalizeYaml : d.normalizeYaml
   }
 }
 

@@ -29,17 +29,37 @@
     "afterPack": "build/afterPack.js",
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "node_modules/pdf-parse/**",
+      "node_modules/node-ensure/**",
+      "node_modules/debug/**",
+      "node_modules/ms/**"
     ],
     "extraResources": [
-      { "from": "build/icon.ico", "to": "icon.ico" },
-      { "from": "build/icon.png", "to": "icon.png" }
+      {
+        "from": "build/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "build/icon.png",
+        "to": "icon.png"
+      }
     ],
     "win": {
       "icon": "build/icon.ico",
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "signAndEditExecutable": false
@@ -62,7 +82,9 @@
     "@monaco-editor/react": "^4.6.0",
     "adm-zip": "^0.5.16",
     "monaco-editor": "^0.52.2",
-    "picomatch": "^4.0.2"
+    "pdf-parse": "^1.1.1",
+    "picomatch": "^4.0.2",
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.7",

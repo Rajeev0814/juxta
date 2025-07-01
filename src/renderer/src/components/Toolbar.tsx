@@ -1,5 +1,5 @@
-import React from 'react'
-import type { CompareMethod, CompareOptions } from '../../../shared/types'
+import React, { useState } from 'react'
+import { DEFAULT_FILTERS, type CompareMethod, type CompareOptions } from '../../../shared/types'
 import type { CompareProfile } from '../../../shared/settings'
 import { FolderPicker } from './FolderPicker'
 
@@ -14,10 +14,13 @@ interface Props {
   onOptions: (o: CompareOptions) => void
   onCompare: () => void
   onCancel: () => void
+  onSwap: () => void
   onToggleTheme: () => void
   profiles: CompareProfile[]
   onApplyProfile: (name: string) => void
   onSaveProfile: () => void
+  /** Save a snapshot of, or open a snapshot into, the given side. */
+  onSnapshot: (action: 'save:left' | 'save:right' | 'open:left' | 'open:right') => void
 }
 
 const METHODS: { value: CompareMethod; label: string }[] = [
@@ -28,8 +31,15 @@ const METHODS: { value: CompareMethod; label: string }[] = [
 
 export function Toolbar(props: Props): React.JSX.Element {
   const { options } = props
+  // Bumped on "Reset filters" to remount the uncontrolled (defaultValue) inputs.
+  const [resetToken, setResetToken] = useState(0)
   const setFilters = (patch: Partial<CompareOptions['filters']>): void =>
     props.onOptions({ ...options, filters: { ...options.filters, ...patch } })
+
+  const resetFilters = (): void => {
+    props.onOptions({ ...options, filters: { ...DEFAULT_FILTERS } })
+    setResetToken((t) => t + 1)
+  }
 
   const parseGlobs = (s: string): string[] =>
     s
@@ -58,6 +68,14 @@ export function Toolbar(props: Props): React.JSX.Element {
             ✕ Cancel
           </button>
         )}
+
+        <button
+          onClick={props.onSwap}
+          disabled={props.comparing}
+          title="Swap the left and right sides (Ctrl+Shift+S)"
+        >
+          ⇄ Swap
+        </button>
 
         <label className="opt">
           Rule:
@@ -97,12 +115,40 @@ export function Toolbar(props: Props): React.JSX.Element {
             Save profile
           </button>
         </span>
+
+        <select
+          className="snapshot-select"
+          value=""
+          onChange={(e) => {
+            const v = e.target.value
+            e.currentTarget.value = ''
+            if (v) props.onSnapshot(v as Parameters<Props['onSnapshot']>[0])
+          }}
+          title="Capture a folder's state to a file, or compare against a saved snapshot"
+        >
+          <option value="" disabled>
+            📸 Snapshot…
+          </option>
+          <option value="save:left" disabled={!props.leftRoot}>
+            Save snapshot of Left
+          </option>
+          <option value="save:right" disabled={!props.rightRoot}>
+            Save snapshot of Right
+          </option>
+          <option value="open:left">Open snapshot as Left…</option>
+          <option value="open:right">Open snapshot as Right…</option>
+        </select>
+
+        <button onClick={resetFilters} title="Reset all filters & rules to defaults">
+          Reset filters
+        </button>
       </div>
 
       <div className="toolbar-row filters">
         <label className="opt grow">
           Include:
           <input
+            key={`inc-${resetToken}`}
             type="text"
             placeholder="*.ts, src/**  (comma separated)"
             defaultValue={options.filters.includeGlobs.join(', ')}
@@ -114,6 +160,7 @@ export function Toolbar(props: Props): React.JSX.Element {
         <label className="opt grow">
           Exclude:
           <input
+            key={`exc-${resetToken}`}
             type="text"
             placeholder="node_modules/, *.log"
             defaultValue={options.filters.excludeGlobs.join(', ')}
@@ -169,9 +216,28 @@ export function Toolbar(props: Props): React.JSX.Element {
           CSV-aware
         </label>
 
+        <label className="opt checkbox" title="Compare .yaml/.yml files by canonical form (ignore formatting & key order)">
+          <input
+            type="checkbox"
+            checked={options.filters.normalizeYaml}
+            onChange={(e) => setFilters({ normalizeYaml: e.target.checked })}
+          />
+          YAML-aware
+        </label>
+
+        <label className="opt checkbox" title="Ignore blank / whitespace-only lines when comparing content">
+          <input
+            type="checkbox"
+            checked={options.filters.ignoreBlankLines}
+            onChange={(e) => setFilters({ ignoreBlankLines: e.target.checked })}
+          />
+          Ignore blank lines
+        </label>
+
         <label className="opt grow" title="Lines matching this regex are ignored when comparing content">
           Ignore lines:
           <input
+            key={`ign-${resetToken}`}
             type="text"
             placeholder="regex, e.g. ^\s*//"
             defaultValue={options.filters.ignoreLinePattern}
