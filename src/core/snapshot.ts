@@ -72,22 +72,29 @@ export function snapshotToWalkEntries(snap: Snapshot): WalkEntry[] {
 }
 
 /**
- * Options for comparing against a snapshot: raw content comparison using the
- * snapshot's include/exclude globs. Content-transforming filters are cleared so
- * the live side is hashed the same way the snapshot was (raw SHA-1).
+ * Raw-content comparison options derived from `base`: keep the include/exclude
+ * globs but force method=content and clear every content-transforming filter,
+ * so a pre-hashed side (snapshot / archive, hashed as raw SHA-1) compares
+ * consistently against a live folder.
  */
-export function snapshotCompareOptions(snap: Snapshot): CompareOptions {
+export function rawContentOptions(base: CompareOptions): CompareOptions {
   return {
     method: 'content',
     filters: {
-      ...snap.options.filters,
+      ...base.filters,
       ignoreWhitespace: false,
       ignoreCase: false,
       ignoreLinePattern: '',
       ignoreBlankLines: false,
       normalizeJson: false,
       normalizeCsv: false,
-      normalizeYaml: false
+      normalizeYaml: false,
+      normalizeXml: false
     }
   }
+}
+
+/** Options for comparing against a snapshot (uses the snapshot's own globs). */
+export function snapshotCompareOptions(snap: Snapshot): CompareOptions {
+  return rawContentOptions(snap.options)
 }

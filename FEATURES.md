@@ -26,11 +26,11 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 ## C. Specialized comparators
 - ✅ C1. Image compare — side-by-side, opacity overlay, swipe, pixel-diff heatmap + diff %
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
-- 🟦 C3. Table compare — ✅ CSV/TSV-aware (ignore row order); ⬜ key-column-aligned table view
-- 🟦 C4. Structured data — ✅ JSON- & YAML-aware compare (ignore formatting/key order); ⬜ XML, key-aligned diff view
+- ✅ C3. Table compare — CSV/TSV-aware (ignore row order) + key-column-aligned table view (row/cell diff, auto-detected)
+- ✅ C4. Structured data — JSON-, YAML- & XML-aware compare + key-aligned structured tree view (added/removed/changed per node, raw-text toggle)
 - ⬜ C5. AST / semantic code diff
-- 🟦 C6. Document text compare — ✅ PDF text-diff (auto-detected, extracted via pdf-parse); ⬜ Office (docx/xlsx)
-- 🟦 C7. Archive browsing — ✅ compare two .zip-family archives as a content tree; ⬜ tar/gz, drill into entries, browse archive vs folder
+- ✅ C6. Document text compare — PDF (pdf-parse) + Office docx/xlsx/pptx text-diff (adm-zip + XML, auto-detected)
+- ✅ C7. Archive browsing — zip-family + tar/tgz/tar.gz; archive ↔ folder compare; drill into an entry to diff its content (text/hex)
 
 ## D. Remote & integration
 - ⬜ D1. Remote folders (SFTP/FTP, S3, ...)
@@ -45,6 +45,6 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ⬜ E3. Streaming / byte-range compare for huge files
 
 ## F. Differentiators
-- 🟦 F1. Diff insights — ✅ +added/−removed line stats (file/text); ⬜ folder churn heatmap
+- ✅ F1. Diff insights — +added/−removed line stats (file/text) + per-directory churn heatmap in the folder tree
 - ✅ F2. Minimap + overview ruler with diff markers
 - 🟦 F3. Comparison profiles — ✅ save/apply named rule+filter profiles (persisted); ⬜ per-project scoping / cloud sync

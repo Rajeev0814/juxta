@@ -42,6 +42,8 @@ export interface FilterOptions {
   normalizeCsv: boolean
   /** Compare .yaml/.yml files by canonical form (ignore formatting & key order). */
   normalizeYaml: boolean
+  /** Compare .xml files by canonical form (ignore formatting & attribute/key order). */
+  normalizeXml: boolean
 }
 
 export interface CompareOptions {
@@ -117,7 +119,8 @@ export const DEFAULT_FILTERS: FilterOptions = {
   ignoreBlankLines: false,
   normalizeJson: false,
   normalizeCsv: false,
-  normalizeYaml: false
+  normalizeYaml: false,
+  normalizeXml: false
 }
 
 export const DEFAULT_OPTIONS: CompareOptions = {

@@ -13,7 +13,8 @@ import {
 import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch, type MergeAction } from '../core/merge'
 import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
 import { toHexDump } from '../core/hex'
-import { readZipEntries } from '../core/archive'
+import { readArchiveEntries, readArchiveEntryData } from '../core/archive'
+import { extractOfficeText } from '../core/office'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
 import { compareEntryLists } from '../core/archiveCompare'
 import { DEFAULT_OPTIONS, type CompareOptions, type CompareResult } from '../shared/types'
@@ -176,9 +177,21 @@ function registerIpc(): void {
   })
 
   ipcMain.handle(IPC.compareArchives, async (_e, leftPath: string, rightPath: string): Promise<CompareResult> => {
-    const { root, summary } = compareEntryLists(readZipEntries(leftPath), readZipEntries(rightPath))
+    const { root, summary } = compareEntryLists(readArchiveEntries(leftPath), readArchiveEntries(rightPath))
     return { leftRoot: leftPath, rightRoot: rightPath, options: DEFAULT_OPTIONS, root, summary, moves: [], elapsedMs: 0 }
   })
+
+  ipcMain.handle(
+    IPC.readArchiveEntry,
+    async (_e, archivePath: string, relPath: string): Promise<{ text: string; binary: boolean }> => {
+      const buf = readArchiveEntryData(archivePath, relPath)
+      if (!buf) return { text: '', binary: true } // absent on this side
+      const enc = detectEncoding(buf)
+      const binary = enc.encoding === 'utf8' && buf.subarray(0, 8192).includes(0)
+      if (binary) return { text: toHexDump(buf, { maxBytes: MAX_HEX_BYTES }), binary: true }
+      return { text: decodeText(buf, enc), binary: false }
+    }
+  )
 
   ipcMain.handle(IPC.setWatch, async (_e, paths: string[] | null) => {
     if (paths && paths.length) folderWatcher.watch(paths)
@@ -234,6 +247,10 @@ function registerIpc(): void {
     const buf = await readFile(path)
     const data = await pdfParse(buf)
     return data.text
+  })
+
+  ipcMain.handle(IPC.readOfficeText, async (_e, path: string): Promise<string> => {
+    return extractOfficeText(path)
   })
 
   ipcMain.handle(IPC.writeFile, async (_e, path: string, text: string) => {

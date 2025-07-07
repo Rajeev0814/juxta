@@ -1,4 +1,6 @@
 import React, { useState } from 'react'
+import { isArchivePath } from '../../../shared/archive'
+import { isSnapshotPath } from '../../../shared/snapshot'
 
 interface Props {
   label: string
@@ -6,6 +8,13 @@ interface Props {
   onChange: (path: string) => void
   /** Pick a file instead of a folder. */
   file?: boolean
+}
+
+/** Icon hinting what this side currently resolves to. */
+function sideIcon(value: string, file: boolean): { icon: string; title: string } {
+  if (value && isSnapshotPath(value)) return { icon: '📸', title: 'Snapshot' }
+  if (value && isArchivePath(value)) return { icon: '🗜', title: 'Archive' }
+  return file ? { icon: '📄', title: 'File' } : { icon: '📁', title: 'Folder' }
 }
 
 /** A path input supporting the Browse dialog and drag-and-drop of a folder or file. */
@@ -38,7 +47,12 @@ export function FolderPicker({ label, value, onChange, file = false }: Props): R
       onDragLeave={() => setDragOver(false)}
       onDrop={onDrop}
     >
-      <span className="folder-picker-label">{label}</span>
+      <span className="folder-picker-label">
+        <span className="side-icon" title={sideIcon(value, file).title}>
+          {sideIcon(value, file).icon}
+        </span>{' '}
+        {label}
+      </span>
       <input
         type="text"
         value={value}

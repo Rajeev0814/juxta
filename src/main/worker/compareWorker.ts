@@ -1,11 +1,15 @@
 import { parentPort } from 'node:worker_threads'
 import { readFile, writeFile } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { compareFolders, type CompareEngineInput } from '../../core/compare'
 import {
   captureSnapshot,
+  rawContentOptions,
   snapshotCompareOptions,
   snapshotToWalkEntries
 } from '../../core/snapshot'
+import { archiveToWalkEntries, isArchivePath, readArchiveEntries } from '../../core/archive'
+import { basename } from 'node:path'
 import { isSnapshotPath, parseSnapshot, type Snapshot } from '../../shared/snapshot'
 import { HashCache } from '../../core/hashCache'
 import type { CompareOptions } from '../../shared/types'
@@ -63,8 +67,8 @@ async function saveCache(path?: string): Promise<void> {
 }
 
 /** Load a snapshot from disk, throwing a readable error if it's malformed. */
-async function loadSnapshot(path: string): Promise<Snapshot> {
-  const snap = parseSnapshot(await readFile(path, 'utf8'))
+function parseSnapshotSync(path: string): Snapshot {
+  const snap = parseSnapshot(readFileSync(path, 'utf8'))
   if (!snap) throw new Error(`Not a valid Juxta snapshot: ${path}`)
   return snap
 }
@@ -72,29 +76,39 @@ async function loadSnapshot(path: string): Promise<Snapshot> {
 async function runCompare(req: Extract<WorkerRequest, { kind?: 'compare' }>): Promise<void> {
   const activeCache = await ensureCache(req.cachePath)
 
-  // Either side may be a saved snapshot file instead of a live folder.
+  // Either side may be a saved snapshot file or an archive instead of a live
+  // folder — both supply pre-hashed entries so that side never touches disk.
   let leftEntries: WalkEntry[] | undefined
   let rightEntries: WalkEntry[] | undefined
   let leftLabel = req.leftRoot
   let rightLabel = req.rightRoot
   let snap: Snapshot | undefined
+  let preHashed = false
 
-  if (isSnapshotPath(req.leftRoot)) {
-    const s = await loadSnapshot(req.leftRoot)
-    snap = s
-    leftEntries = snapshotToWalkEntries(s)
-    leftLabel = `${s.root} @snapshot`
-  }
-  if (isSnapshotPath(req.rightRoot)) {
-    const s = await loadSnapshot(req.rightRoot)
-    snap = snap ?? s
-    rightEntries = snapshotToWalkEntries(s)
-    rightLabel = `${s.root} @snapshot`
+  const resolveSide = (path: string): { entries?: WalkEntry[]; label: string } => {
+    if (isSnapshotPath(path)) {
+      const s = parseSnapshotSync(path)
+      snap = snap ?? s
+      preHashed = true
+      return { entries: snapshotToWalkEntries(s), label: `${s.root} @snapshot` }
+    }
+    if (isArchivePath(path)) {
+      preHashed = true
+      return { entries: archiveToWalkEntries(readArchiveEntries(path), path), label: `${basename(path)} (archive)` }
+    }
+    return { label: path }
   }
 
-  // When comparing against a snapshot, hash the live side raw (matching how the
-  // snapshot was captured) and reuse the snapshot's include/exclude globs.
-  const options = snap ? snapshotCompareOptions(snap) : req.options
+  const left = resolveSide(req.leftRoot)
+  const right = resolveSide(req.rightRoot)
+  leftEntries = left.entries
+  rightEntries = right.entries
+  leftLabel = left.label
+  rightLabel = right.label
+
+  // A pre-hashed side (snapshot / archive) forces raw-content comparison so the
+  // live side is hashed the same way (raw SHA-1). A snapshot brings its own globs.
+  const options = snap ? snapshotCompareOptions(snap) : preHashed ? rawContentOptions(req.options) : req.options
 
   const result = await compareFolders({
     leftRoot: leftLabel,

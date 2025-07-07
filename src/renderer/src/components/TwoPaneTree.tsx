@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import type { CompareNode, CompareResult, Side } from '../../../shared/types'
 import { ancestorsOf, collectDirRelPaths } from '../../../shared/nav'
+import { churnByDir, type Churn } from '../../../shared/churn'
 import { defaultExpanded, flatten, formatSize, formatTime, statusClass } from '../lib/treeUtils'
+
+/** Green→red heat colour for a change ratio in [0, 1]. */
+function heatColor(ratio: number): string {
+  return `hsl(${Math.round((1 - ratio) * 120)}, 65%, 45%)`
+}
 
 const ROW_H = 24
 const OVERSCAN = 12
@@ -50,6 +56,9 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
     () => flatten(result.root, expanded, props.hideIdentical),
     [result, expanded, props.hideIdentical]
   )
+
+  // Per-directory change density (folder churn heatmap).
+  const churn = useMemo(() => churnByDir(result.root), [result])
 
   // Reveal a target row: expand its ancestors and scroll it to center.
   const reveal = props.reveal
@@ -115,6 +124,7 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
               <TreeRow
                 key={row.node.relPath}
                 row={row}
+                churn={row.node.kind === 'directory' ? churn.get(row.node.relPath) : undefined}
                 selected={props.selectedRelPath === row.node.relPath}
                 onToggle={toggle}
                 onSelect={props.onSelect}
@@ -135,6 +145,7 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
 
 interface RowProps {
   row: ReturnType<typeof flatten>[number]
+  churn?: Churn
   selected: boolean
   onToggle: (relPath: string) => void
   onSelect: (node: CompareNode) => void
@@ -146,7 +157,7 @@ interface RowProps {
   onContextMenu?: (path: string) => void
 }
 
-function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete, onCopyTime, readOnly, onContextMenu }: RowProps): React.JSX.Element {
+function TreeRow({ row, churn, selected, onToggle, onSelect, onOpenFile, onCopy, onDelete, onCopyTime, readOnly, onContextMenu }: RowProps): React.JSX.Element {
   const { node, depth, hasChildren, expanded } = row
   const isDir = node.kind === 'directory'
 
@@ -192,6 +203,20 @@ function TreeRow({ row, selected, onToggle, onSelect, onOpenFile, onCopy, onDele
               <span className="meta">
                 {formatSize(node.left.size)} · {formatTime(node.left.mtimeMs)}
                 {node.newer === 'left' && <span className="newer"> ●newer</span>}
+              </span>
+            )}
+            {isDir && churn && churn.total > 0 && (
+              <span
+                className="churn"
+                title={`${churn.changed} of ${churn.total} files changed (${Math.round(churn.ratio * 100)}%)`}
+              >
+                <span className="churn-bar">
+                  <span
+                    className="churn-fill"
+                    style={{ width: `${churn.ratio * 100}%`, background: heatColor(churn.ratio) }}
+                  />
+                </span>
+                <span className="churn-pct">{Math.round(churn.ratio * 100)}%</span>
               </span>
             )}
           </>

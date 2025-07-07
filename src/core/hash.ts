@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises'
 import { canonicalizeJson } from './json'
 import { canonicalizeCsv } from './csv'
 import { canonicalizeYaml } from './yaml'
+import { canonicalizeXml } from './xml'
 
 export interface HashOptions {
   ignoreWhitespace: boolean
@@ -18,6 +19,8 @@ export interface HashOptions {
   normalizeCsv?: boolean
   /** Canonicalize .yaml/.yml files (sorted keys, formatting-independent) before hashing. */
   normalizeYaml?: boolean
+  /** Canonicalize .xml files (sorted keys/attrs, formatting-independent) before hashing. */
+  normalizeXml?: boolean
 }
 
 /** Remove blank / whitespace-only lines. */
@@ -78,6 +81,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
   const hasPattern = !!options.ignoreLinePattern
   const wantJson = !!options.normalizeJson && /\.json$/i.test(filePath)
   const wantYaml = !!options.normalizeYaml && /\.ya?ml$/i.test(filePath)
+  const wantXml = !!options.normalizeXml && /\.xml$/i.test(filePath)
   const csvDelimiter = /\.tsv$/i.test(filePath) ? '\t' : /\.csv$/i.test(filePath) ? ',' : null
   const wantCsv = !!options.normalizeCsv && csvDelimiter !== null
   if (
@@ -87,6 +91,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
     !hasPattern &&
     !wantJson &&
     !wantYaml &&
+    !wantXml &&
     !wantCsv
   ) {
     return hashFileRaw(filePath)
@@ -111,6 +116,15 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
       return createHash('sha1').update(out).digest('hex')
     }
     // Not valid YAML — fall through to the regular normalizers.
+  }
+
+  if (wantXml) {
+    const canonical = canonicalizeXml(text)
+    if (canonical !== null) {
+      const out = options.ignoreCase ? canonical.toLowerCase() : canonical
+      return createHash('sha1').update(out).digest('hex')
+    }
+    // Not well-formed XML — fall through to the regular normalizers.
   }
 
   if (wantCsv && csvDelimiter !== null) {

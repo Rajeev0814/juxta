@@ -72,7 +72,8 @@ function coerceFilters(raw: unknown): FilterOptions {
     ignoreBlankLines: typeof raw.ignoreBlankLines === 'boolean' ? raw.ignoreBlankLines : d.ignoreBlankLines,
     normalizeJson: typeof raw.normalizeJson === 'boolean' ? raw.normalizeJson : d.normalizeJson,
     normalizeCsv: typeof raw.normalizeCsv === 'boolean' ? raw.normalizeCsv : d.normalizeCsv,
-    normalizeYaml: typeof raw.normalizeYaml === 'boolean' ? raw.normalizeYaml : d.normalizeYaml
+    normalizeYaml: typeof raw.normalizeYaml === 'boolean' ? raw.normalizeYaml : d.normalizeYaml,
+    normalizeXml: typeof raw.normalizeXml === 'boolean' ? raw.normalizeXml : d.normalizeXml
   }
 }
 

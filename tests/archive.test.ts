@@ -3,8 +3,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import AdmZip from 'adm-zip'
 import { afterAll, describe, expect, it } from 'vitest'
-import { isArchivePath, readZipEntries } from '../src/core/archive'
+import { archiveToWalkEntries, isArchivePath, readArchiveEntryData, readZipEntries } from '../src/core/archive'
 import { compareEntryLists } from '../src/core/archiveCompare'
+import { compareFolders } from '../src/core/compare'
+import { rawContentOptions } from '../src/core/snapshot'
+import { DEFAULT_OPTIONS } from '../src/shared/types'
+import { makeTree } from './helpers'
 import type { ArchiveEntry } from '../src/core/archive'
 
 function indexNodes(root: import('../src/shared/types').CompareNode): Map<string, import('../src/shared/types').CompareNode> {
@@ -70,5 +74,66 @@ describe('readZipEntries', () => {
     expect(hello.size).toBe('hello world'.length)
     expect(hello.hash).toMatch(/^[0-9a-f]{40}$/)
     expect(files.some((e) => e.relPath === 'dir/nested.txt')).toBe(true)
+  })
+
+  it('reads a single entry\'s bytes for drill-in (and null when absent)', async () => {
+    const zip = new AdmZip()
+    zip.addFile('a/b.txt', Buffer.from('drill me', 'utf8'))
+    const zipPath = join(dir, 'drill.zip')
+    zip.writeZip(zipPath)
+
+    expect(readArchiveEntryData(zipPath, 'a/b.txt')?.toString('utf8')).toBe('drill me')
+    expect(readArchiveEntryData(zipPath, 'missing.txt')).toBeNull()
+  })
+})
+
+describe('archiveToWalkEntries', () => {
+  it('synthesizes directory entries for every ancestor and keeps file hashes', () => {
+    const entries: ArchiveEntry[] = [
+      { relPath: 'a.txt', isDir: false, size: 3, hash: 'h1' },
+      { relPath: 'sub/deep/b.txt', isDir: false, size: 4, hash: 'h2' }
+    ]
+    const walk = archiveToWalkEntries(entries, '/tmp/x.zip')
+    const byRel = new Map(walk.map((w) => [w.relPath, w]))
+    expect(byRel.get('sub')?.kind).toBe('directory')
+    expect(byRel.get('sub/deep')?.kind).toBe('directory')
+    expect(byRel.get('sub/deep/b.txt')?.kind).toBe('file')
+    expect(byRel.get('sub/deep/b.txt')?.hash).toBe('h2')
+    expect(byRel.get('a.txt')?.hash).toBe('h1')
+  })
+})
+
+describe('compare an archive against a folder', () => {
+  let dir: string
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true })
+  })
+
+  it('classifies files across a .zip and a live folder by content', async () => {
+    dir = await mkdtemp(join(tmpdir(), 'juxta-af-'))
+    const zip = new AdmZip()
+    zip.addFile('same.txt', Buffer.from('shared', 'utf8'))
+    zip.addFile('changed.txt', Buffer.from('zip version', 'utf8'))
+    zip.addFile('only-zip.txt', Buffer.from('z', 'utf8'))
+    const zipPath = join(dir, 'bundle.zip')
+    zip.writeZip(zipPath)
+
+    const folder = await makeTree({
+      'same.txt': 'shared',
+      'changed.txt': 'folder version',
+      'only-folder.txt': 'f'
+    })
+
+    const result = await compareFolders({
+      leftRoot: folder,
+      rightRoot: zipPath,
+      options: rawContentOptions(DEFAULT_OPTIONS),
+      rightEntries: archiveToWalkEntries(readZipEntries(zipPath), zipPath)
+    })
+
+    expect(result.summary.identical).toBe(1) // same.txt
+    expect(result.summary.different).toBe(1) // changed.txt
+    expect(result.summary.leftOnly).toBe(1) // only-folder.txt
+    expect(result.summary.rightOnly).toBe(1) // only-zip.txt
   })
 })

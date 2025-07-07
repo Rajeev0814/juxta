@@ -7,6 +7,10 @@ interface Props {
   left: string
   right: string
   theme: 'light' | 'dark'
+  /** Bar title, e.g. "PDF Compare" / "Document Compare". */
+  title: string
+  /** Extract the comparable plain text from a file path (via the main process). */
+  extract: (path: string) => Promise<string>
   /** Register prev/next-diff handlers so global shortcuts (F6) can drive them. */
   registerNav: (nav: { next: () => void; prev: () => void } | null) => void
 }
@@ -16,10 +20,17 @@ function baseName(p: string): string {
 }
 
 /**
- * Compare two PDF documents by extracting their text (in the main process via
- * pdf-parse) and diffing it in a read-only side-by-side editor.
+ * Compare two documents by extracting their text (in the main process) and
+ * diffing it in a read-only side-by-side editor. Used for PDF and Office files.
  */
-export function PdfCompareView({ left, right, theme, registerNav }: Props): React.JSX.Element {
+export function ExtractedTextCompareView({
+  left,
+  right,
+  theme,
+  title,
+  extract,
+  registerNav
+}: Props): React.JSX.Element {
   const [leftText, setLeftText] = useState<string | null>(null)
   const [rightText, setRightText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,7 +47,7 @@ export function PdfCompareView({ left, right, theme, registerNav }: Props): Reac
     setError(null)
     const run = async (): Promise<void> => {
       try {
-        const [lt, rt] = await Promise.all([window.api.readPdfText(left), window.api.readPdfText(right)])
+        const [lt, rt] = await Promise.all([extract(left), extract(right)])
         if (cancelled) return
         setLeftText(lt)
         setRightText(rt)
@@ -48,7 +59,7 @@ export function PdfCompareView({ left, right, theme, registerNav }: Props): Reac
     return () => {
       cancelled = true
     }
-  }, [left, right])
+  }, [left, right, extract])
 
   const gotoDiff = useCallback((dir: 1 | -1): void => {
     const editor = editorRef.current
@@ -85,7 +96,7 @@ export function PdfCompareView({ left, right, theme, registerNav }: Props): Reac
   return (
     <div className="file-compare">
       <div className="file-compare-bar">
-        <span className="fc-name">PDF Compare</span>
+        <span className="fc-name">{title}</span>
         <span className="fc-hint" title={`${left}  ↔  ${right}`}>
           {baseName(left)} ↔ {baseName(right)} · extracted text
         </span>
@@ -110,8 +121,8 @@ export function PdfCompareView({ left, right, theme, registerNav }: Props): Reac
       </div>
 
       <div className="file-compare-body">
-        {error && <div className="fc-message error">Failed to read PDF: {error}</div>}
-        {!error && !ready && <div className="fc-message">Extracting PDF text…</div>}
+        {error && <div className="fc-message error">Failed to read document: {error}</div>}
+        {!error && !ready && <div className="fc-message">Extracting text…</div>}
         {!error && ready && (
           <DiffEditor
             original={leftText}

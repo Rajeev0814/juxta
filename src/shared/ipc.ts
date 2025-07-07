@@ -11,11 +11,13 @@ export const IPC = {
   saveSnapshot: 'snapshot:save',
   compare: 'compare:run',
   compareArchives: 'compare:archives',
+  readArchiveEntry: 'compare:readArchiveEntry',
   cancelCompare: 'compare:cancel',
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
   readImage: 'fs:readImage',
   readPdfText: 'fs:readPdfText',
+  readOfficeText: 'fs:readOfficeText',
   writeFile: 'fs:writeFile',
   saveText: 'fs:saveText',
   writeClipboard: 'clipboard:write',
@@ -78,6 +80,12 @@ export interface FileContents {
   eol: string
 }
 
+export interface ArchiveEntryContent {
+  text: string
+  /** True when the entry looked binary (shown as a hex dump), or was absent. */
+  binary: boolean
+}
+
 // The API surface exposed to the renderer via contextBridge.
 export interface RendererApi {
   selectFolder(): Promise<string | null>
@@ -89,6 +97,8 @@ export interface RendererApi {
   compare(req: CompareRequest): Promise<CompareResult>
   /** Compare the contents of two archive files (e.g. .zip) as a tree. */
   compareArchives(leftPath: string, rightPath: string): Promise<CompareResult>
+  /** Read one entry's content from an archive as text (hex dump when binary). */
+  readArchiveEntry(archivePath: string, relPath: string): Promise<ArchiveEntryContent>
   cancelCompare(): Promise<void>
   onProgress(cb: (update: ProgressUpdate) => void): () => void
   readFile(path: string): Promise<FileContents>
@@ -96,6 +106,8 @@ export interface RendererApi {
   readImage(path: string): Promise<string | null>
   /** Extract the plain text of a PDF file for text-level comparison. */
   readPdfText(path: string): Promise<string>
+  /** Extract the plain text of a .docx/.xlsx file for text-level comparison. */
+  readOfficeText(path: string): Promise<string>
   writeFile(path: string, text: string): Promise<void>
   writeClipboard(text: string): Promise<void>
   /** Prompt for a save location and write text; returns the path or null if cancelled. */

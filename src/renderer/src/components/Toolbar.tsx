@@ -225,6 +225,15 @@ export function Toolbar(props: Props): React.JSX.Element {
           YAML-aware
         </label>
 
+        <label className="opt checkbox" title="Compare .xml files by canonical form (ignore formatting & attribute/key order)">
+          <input
+            type="checkbox"
+            checked={options.filters.normalizeXml}
+            onChange={(e) => setFilters({ normalizeXml: e.target.checked })}
+          />
+          XML-aware
+        </label>
+
         <label className="opt checkbox" title="Ignore blank / whitespace-only lines when comparing content">
           <input
             type="checkbox"

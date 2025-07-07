@@ -20,11 +20,16 @@ import { TextCompare } from './components/TextCompare'
 import { MergeView } from './components/MergeView'
 import { ArchiveCompareView } from './components/ArchiveCompareView'
 import { ImageCompareView } from './components/ImageCompareView'
-import { PdfCompareView } from './components/PdfCompareView'
+import { ExtractedTextCompareView } from './components/ExtractedTextCompareView'
+import { TableCompareView } from './components/TableCompareView'
+import { StructuredCompareView } from './components/StructuredCompareView'
 import { ShortcutsHelp } from './components/ShortcutsHelp'
 import { isArchivePath } from '../../shared/archive'
 import { isImagePath } from '../../shared/image'
 import { isPdfPath } from '../../shared/pdf'
+import { isOfficePath } from '../../shared/office'
+import { isTablePath } from '../../shared/csv'
+import { structKind } from '../../shared/structured'
 import type { MergeArgs } from '../../shared/git'
 import { StatusBar } from './components/StatusBar'
 import { useCompare } from './hooks/useCompare'
@@ -662,18 +667,41 @@ export default function App(): React.JSX.Element {
           </div>
           <div className="app-body">
             {active.leftFile && active.rightFile && isArchivePath(active.leftFile) && isArchivePath(active.rightFile) ? (
-              <ArchiveCompareView left={active.leftFile} right={active.rightFile} hideIdentical={hideIdentical} />
+              <ArchiveCompareView left={active.leftFile} right={active.rightFile} hideIdentical={hideIdentical} theme={theme} />
             ) : active.leftFile && active.rightFile && isImagePath(active.leftFile) && isImagePath(active.rightFile) ? (
               <ImageCompareView left={active.leftFile} right={active.rightFile} />
             ) : active.leftFile && active.rightFile && isPdfPath(active.leftFile) && isPdfPath(active.rightFile) ? (
-              <PdfCompareView
+              <ExtractedTextCompareView
                 key={`${active.id}:${active.leftFile}|${active.rightFile}`}
                 left={active.leftFile}
                 right={active.rightFile}
                 theme={theme}
+                title="PDF Compare"
+                extract={(p) => window.api.readPdfText(p)}
                 registerNav={(nav) => {
                   navRef.current = nav
                 }}
+              />
+            ) : active.leftFile && active.rightFile && isOfficePath(active.leftFile) && isOfficePath(active.rightFile) ? (
+              <ExtractedTextCompareView
+                key={`${active.id}:${active.leftFile}|${active.rightFile}`}
+                left={active.leftFile}
+                right={active.rightFile}
+                theme={theme}
+                title="Document Compare"
+                extract={(p) => window.api.readOfficeText(p)}
+                registerNav={(nav) => {
+                  navRef.current = nav
+                }}
+              />
+            ) : active.leftFile && active.rightFile && isTablePath(active.leftFile) && isTablePath(active.rightFile) ? (
+              <TableCompareView left={active.leftFile} right={active.rightFile} hideIdentical={hideIdentical} />
+            ) : active.leftFile && active.rightFile && structKind(active.leftFile) && structKind(active.rightFile) ? (
+              <StructuredCompareView
+                left={active.leftFile}
+                right={active.rightFile}
+                theme={theme}
+                hideIdentical={hideIdentical}
               />
             ) : directNode ? (
               <FileCompare
@@ -695,9 +723,13 @@ export default function App(): React.JSX.Element {
                   <br />
                   🖼 <b>images</b> (png/jpg/gif/webp…) → side-by-side, overlay, swipe &amp; pixel-diff
                   <br />
-                  📄 <b>PDFs</b> → extracted-text diff
+                  📄 <b>PDF &amp; Office</b> (pdf/docx/xlsx/pptx) → extracted-text diff
                   <br />
-                  🗜 <b>archives</b> (zip/jar…) → content-tree compare
+                  🗜 <b>archives</b> (zip/jar/tar/tgz…) → content-tree compare
+                  <br />
+                  📊 <b>tables</b> (csv/tsv) → key-aligned row/cell compare
+                  <br />
+                  🧩 <b>structured</b> (json/yaml/xml) → key-aligned tree (or raw text)
                   <br />
                   📝 anything else → text / hex diff
                 </p>
