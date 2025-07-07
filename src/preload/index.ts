@@ -18,6 +18,8 @@ const api: RendererApi = {
   compare: (req: CompareRequest): Promise<CompareResult> => ipcRenderer.invoke(IPC.compare, req),
   compareArchives: (leftPath: string, rightPath: string): Promise<CompareResult> =>
     ipcRenderer.invoke(IPC.compareArchives, leftPath, rightPath),
+  readArchiveEntry: (archivePath: string, relPath: string) =>
+    ipcRenderer.invoke(IPC.readArchiveEntry, archivePath, relPath),
   cancelCompare: () => ipcRenderer.invoke(IPC.cancelCompare),
   onProgress: (cb: (update: ProgressUpdate) => void) => {
     const listener = (_e: unknown, update: ProgressUpdate): void => cb(update)
@@ -27,6 +29,7 @@ const api: RendererApi = {
   readFile: (path: string): Promise<FileContents> => ipcRenderer.invoke(IPC.readFile, path),
   readImage: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.readImage, path),
   readPdfText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readPdfText, path),
+  readOfficeText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readOfficeText, path),
   writeFile: (path: string, text: string) => ipcRenderer.invoke(IPC.writeFile, path, text),
   writeClipboard: (text: string) => ipcRenderer.invoke(IPC.writeClipboard, text),
   saveText: (defaultName: string, content: string) => ipcRenderer.invoke(IPC.saveText, defaultName, content),

@@ -330,6 +330,33 @@
   color: var(--accent);
   font-weight: 600;
 }
+
+/* folder churn heatmap (per-directory change density) */
+.churn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  padding-left: 8px;
+}
+.churn-bar {
+  width: 42px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-elev);
+  overflow: hidden;
+}
+.churn-fill {
+  display: block;
+  height: 100%;
+}
+.churn-pct {
+  color: var(--text-dim);
+  font-size: 10px;
+  min-width: 26px;
+  text-align: right;
+}
 .moved {
   color: var(--accent);
   font-weight: 700;
@@ -577,6 +604,113 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
+}
+
+/* ---------- Structured compare ---------- */
+.struct-tree {
+  height: 100%;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 4px 0;
+}
+.struct-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  cursor: default;
+  padding-right: 10px;
+}
+.struct-row:hover {
+  background: var(--row-hover);
+}
+.struct-key {
+  color: var(--text);
+  flex: none;
+}
+.struct-val {
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.struct-val .arrow {
+  color: var(--text-dim);
+}
+.struct-val .dim,
+.struct-val.dim {
+  color: var(--text-dim);
+}
+.struct-row.st-different .struct-key {
+  color: var(--st-different);
+}
+.struct-row.st-left-only {
+  background-color: var(--st-left-only-bg);
+}
+.struct-row.st-right-only {
+  background-color: var(--st-right-only-bg);
+}
+.struct-val .add {
+  color: var(--st-left-only);
+}
+.struct-val .del {
+  color: var(--st-right-only);
+}
+
+/* ---------- Table compare ---------- */
+.table-compare {
+  overflow: auto;
+}
+.table-diff {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 12px;
+  width: max-content;
+  min-width: 100%;
+}
+.table-diff th,
+.table-diff td {
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  text-align: left;
+  white-space: nowrap;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.table-diff thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-elev);
+  color: var(--text-dim);
+}
+.table-diff th.tc-key {
+  color: var(--text);
+}
+.table-diff td.tc-status,
+.table-diff th.tc-status {
+  width: 20px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.table-diff tr.st-different td:not(.tc-status) {
+  background-color: var(--st-different-bg);
+}
+.table-diff tr.st-left-only td:not(.tc-status) {
+  background-color: var(--st-left-only-bg);
+}
+.table-diff tr.st-right-only td:not(.tc-status) {
+  background-color: var(--st-right-only-bg);
+}
+.table-diff td.tc-cell-changed {
+  background-color: var(--st-different) !important;
+  color: var(--bg-panel);
+  font-weight: 600;
+}
+.fc-hint .chg {
+  color: var(--st-different);
 }
 
 /* ---------- Status bar ---------- */

@@ -58,4 +58,15 @@ describe('hashFile', () => {
     const hb = await hashFile(join(root, 'b.yaml'), opts)
     expect(ha).toBe(hb)
   })
+
+  it('canonicalizes .xml files when normalizeXml is set (formatting & attr order ignored)', async () => {
+    const root = await makeTree({
+      'a.xml': '<r a="1" b="2"><c>t</c></r>',
+      'b.xml': '<r b="2" a="1">\n  <c>t</c>\n</r>'
+    })
+    const opts = { ignoreWhitespace: false, ignoreCase: false, normalizeXml: true }
+    const ha = await hashFile(join(root, 'a.xml'), opts)
+    const hb = await hashFile(join(root, 'b.xml'), opts)
+    expect(ha).toBe(hb)
+  })
 })

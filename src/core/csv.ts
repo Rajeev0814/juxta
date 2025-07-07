@@ -1,47 +1,10 @@
-// Minimal RFC-4180-ish CSV/TSV handling, used to compare tabular files while
-// ignoring row order (and formatting/quoting noise). Pure + unit-tested.
+// CSV/TSV canonicalization for content comparison (ignore row order / quoting
+// noise). The RFC-4180-ish parser now lives in shared/csv.ts so the renderer's
+// table view can reuse it; re-exported here for existing importers. Pure.
 
-export function parseCsv(text: string, delimiter: string): string[][] {
-  const records: string[][] = []
-  let field = ''
-  let record: string[] = []
-  let inQuotes = false
-  let sawAny = false
+import { parseCsv } from '../shared/csv'
 
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i]
-    sawAny = true
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') {
-          field += '"'
-          i++
-        } else {
-          inQuotes = false
-        }
-      } else {
-        field += c
-      }
-    } else if (c === '"') {
-      inQuotes = true
-    } else if (c === delimiter) {
-      record.push(field)
-      field = ''
-    } else if (c === '\n') {
-      record.push(field)
-      records.push(record)
-      record = []
-      field = ''
-    } else if (c !== '\r') {
-      field += c
-    }
-  }
-  if (field.length > 0 || record.length > 0 || (sawAny && records.length === 0)) {
-    record.push(field)
-    records.push(record)
-  }
-  return records
-}
+export { parseCsv } from '../shared/csv'
 
 function quoteField(value: string, delimiter: string): string {
   if (value.includes(delimiter) || value.includes('"') || value.includes('\n') || value.includes('\r')) {

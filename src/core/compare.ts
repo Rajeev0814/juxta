@@ -42,11 +42,18 @@ async function cachedHash(
   const normalizeJson = options.filters.normalizeJson
   const normalizeCsv = options.filters.normalizeCsv
   const normalizeYaml = options.filters.normalizeYaml
+  const normalizeXml = options.filters.normalizeXml
   // The hash cache keys on ws/ic only, so bypass it when a content-transforming
-  // filter (line-ignore regex / blank lines / JSON / CSV / YAML) is active to
-  // avoid stale hits.
+  // filter (line-ignore regex / blank lines / JSON / CSV / YAML / XML) is active
+  // to avoid stale hits.
   const useCache =
-    cache && !pattern && !ignoreBlankLines && !normalizeJson && !normalizeCsv && !normalizeYaml
+    cache &&
+    !pattern &&
+    !ignoreBlankLines &&
+    !normalizeJson &&
+    !normalizeCsv &&
+    !normalizeYaml &&
+    !normalizeXml
   const hit = useCache ? cache.get(entry.path, entry.size, entry.mtimeMs, ws, ic) : undefined
   if (hit !== undefined) return hit
   try {
@@ -57,7 +64,8 @@ async function cachedHash(
       ignoreBlankLines,
       normalizeJson,
       normalizeCsv,
-      normalizeYaml
+      normalizeYaml,
+      normalizeXml
     })
     if (useCache) cache.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
     return hash
@@ -239,6 +247,7 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
         options.filters.normalizeJson ||
         options.filters.normalizeCsv ||
         options.filters.normalizeYaml ||
+        options.filters.normalizeXml ||
         sizeMatch
       if (mustHash) {
         toHash.push(m.left, m.right)

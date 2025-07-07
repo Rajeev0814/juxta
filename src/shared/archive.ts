@@ -7,8 +7,13 @@ export interface ArchiveEntry {
   hash: string
 }
 
-const ARCHIVE_RE = /\.(zip|jar|war|whl|nupkg|vsix|epub)$/i
+const ARCHIVE_RE = /\.(zip|jar|war|whl|nupkg|vsix|epub|tar|tgz|tar\.gz)$/i
 
 export function isArchivePath(p: string): boolean {
   return ARCHIVE_RE.test(p)
+}
+
+/** True for tar-family archives (read via the tar reader, not adm-zip). */
+export function isTarPath(p: string): boolean {
+  return /\.(tar|tgz|tar\.gz)$/i.test(p)
 }
