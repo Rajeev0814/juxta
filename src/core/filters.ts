@@ -1,5 +1,5 @@
 import picomatch from 'picomatch'
-import type { FilterOptions } from '../shared/types'
+import type { FileTypeRule, FilterOptions } from '../shared/types'
 import type { IgnoreMatcher } from './ignore'
 
 export interface Matcher {
@@ -41,6 +41,34 @@ export function normalizeGlob(pattern: string): string[] {
 
 function expandAll(globs: string[]): string[] {
   return globs.flatMap(normalizeGlob)
+}
+
+export interface TypeRuleOverrides {
+  ignoreWhitespace?: boolean
+  ignoreCase?: boolean
+  ignoreBlankLines?: boolean
+}
+
+/**
+ * Merge the overrides of every type rule whose glob matches `relPath` (later
+ * rules win). Globs are matched against both the full relative path and the
+ * bare filename, so "*.md" works at any depth. Returns null when none match.
+ */
+export function resolveTypeRules(relPath: string, rules: FileTypeRule[]): TypeRuleOverrides | null {
+  if (!rules.length) return null
+  const name = relPath.slice(relPath.lastIndexOf('/') + 1)
+  let merged: TypeRuleOverrides | null = null
+  for (const rule of rules) {
+    const glob = rule.glob.trim()
+    if (!glob) continue
+    const isMatch = picomatch(expandAll([glob]), { dot: true, nocase: true })
+    if (!isMatch(relPath) && !isMatch(name)) continue
+    merged = merged ?? {}
+    if (rule.ignoreWhitespace !== undefined) merged.ignoreWhitespace = rule.ignoreWhitespace
+    if (rule.ignoreCase !== undefined) merged.ignoreCase = rule.ignoreCase
+    if (rule.ignoreBlankLines !== undefined) merged.ignoreBlankLines = rule.ignoreBlankLines
+  }
+  return merged
 }
 
 export function createMatcher(filters: FilterOptions): Matcher {

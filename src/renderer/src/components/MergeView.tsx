@@ -2,7 +2,7 @@ import { Editor } from '@monaco-editor/react'
 import type { editor as Mon } from 'monaco-editor'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import type { MergeArgs } from '../../../shared/git'
-import { merge3 } from '../../../shared/merge3'
+import { countConflicts, merge3, resolveConflictAt, type ConflictChoice } from '../../../shared/merge3'
 import { languageForPath } from '../lib/language'
 import { juxtaTheme } from '../lib/monacoSetup'
 
@@ -75,6 +75,20 @@ export function MergeView({ args, theme, onDone, registerNav }: Props): React.JS
     return () => registerNav(null)
   }, [gotoConflict, registerNav])
 
+  // Resolve the conflict at the cursor by keeping local / remote / both sides.
+  const resolveAtCursor = useCallback(
+    (choice: ConflictChoice): void => {
+      const editor = editorRef.current
+      if (!editor || text === null) return
+      const line = editor.getPosition()?.lineNumber ?? 1
+      const next = resolveConflictAt(text, line, choice)
+      if (next === null) return
+      setText(next)
+      setConflicts(countConflicts(next))
+    },
+    [text]
+  )
+
   const save = useCallback(async (): Promise<void> => {
     if (text === null) return
     await window.api.writeFile(args.merged, text)
@@ -95,6 +109,16 @@ export function MergeView({ args, theme, onDone, registerNav }: Props): React.JS
           </button>
           <button onClick={() => gotoConflict(1)} disabled={conflicts === 0} title="Next conflict (F6)">
             ↓
+          </button>
+          <span className="fc-sep" />
+          <button onClick={() => resolveAtCursor('local')} disabled={conflicts === 0} title="Keep LOCAL (ours) for the conflict at the cursor">
+            ◀ Local
+          </button>
+          <button onClick={() => resolveAtCursor('remote')} disabled={conflicts === 0} title="Keep REMOTE (theirs) for the conflict at the cursor">
+            Remote ▶
+          </button>
+          <button onClick={() => resolveAtCursor('both')} disabled={conflicts === 0} title="Keep both sides for the conflict at the cursor">
+            Both
           </button>
           <span className="fc-sep" />
           <button className={saved ? '' : 'primary'} onClick={() => void save()} disabled={text === null}>

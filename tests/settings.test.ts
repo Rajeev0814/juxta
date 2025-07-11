@@ -77,6 +77,24 @@ describe('coerceSettings', () => {
     expect(coerceSettings({}).profiles).toEqual([])
   })
 
+  it('keeps valid project scopes and drops ones missing a path', () => {
+    const s = coerceSettings({
+      projectScopes: [
+        { left: '/a', right: '/b', options: { method: 'quick', filters: { normalizeCode: true } } },
+        { left: '/a' }, // no right -> dropped
+        'nope'
+      ]
+    })
+    expect(s.projectScopes).toHaveLength(1)
+    expect(s.projectScopes[0]).toMatchObject({ left: '/a', right: '/b' })
+    expect(s.projectScopes[0].options.method).toBe('quick')
+    expect(s.projectScopes[0].options.filters.normalizeCode).toBe(true)
+  })
+
+  it('defaults project scopes to an empty array', () => {
+    expect(coerceSettings({}).projectScopes).toEqual([])
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,

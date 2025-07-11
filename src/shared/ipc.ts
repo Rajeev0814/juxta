@@ -1,4 +1,4 @@
-import type { CompareOptions, CompareResult, ProgressUpdate, Side } from './types'
+import type { CompareOptions, CompareResult, ProgressUpdate, Side, ThreeWayResult } from './types'
 import type { PersistedSettings } from './settings'
 import type { MergeAction } from './sync'
 import type { DiffPair, MergeArgs } from './git'
@@ -10,11 +10,14 @@ export const IPC = {
   selectSnapshot: 'dialog:selectSnapshot',
   saveSnapshot: 'snapshot:save',
   compare: 'compare:run',
+  compare3: 'compare:run3',
   compareArchives: 'compare:archives',
   readArchiveEntry: 'compare:readArchiveEntry',
   cancelCompare: 'compare:cancel',
   compareProgress: 'compare:progress', // main -> renderer (event)
   readFile: 'fs:readFile',
+  readFileRange: 'fs:readFileRange',
+  firstDifference: 'fs:firstDifference',
   readImage: 'fs:readImage',
   readPdfText: 'fs:readPdfText',
   readOfficeText: 'fs:readOfficeText',
@@ -80,6 +83,20 @@ export interface FileContents {
   eol: string
 }
 
+export interface HexWindow {
+  /** Hex dump of the requested window, with addresses at the true file offset. */
+  hex: string
+  /** Total file size in bytes. */
+  size: number
+}
+
+export interface DiffOffset {
+  /** First differing byte offset, or -1 if identical. */
+  offset: number
+  leftSize: number
+  rightSize: number
+}
+
 export interface ArchiveEntryContent {
   text: string
   /** True when the entry looked binary (shown as a hex dump), or was absent. */
@@ -95,6 +112,8 @@ export interface RendererApi {
   /** Capture a folder to a snapshot file; returns the saved path or null if cancelled. */
   saveSnapshot(root: string, options: CompareOptions): Promise<string | null>
   compare(req: CompareRequest): Promise<CompareResult>
+  /** 3-way folder compare (base / left / right) with per-file classification. */
+  compare3(baseRoot: string, leftRoot: string, rightRoot: string, options: CompareOptions): Promise<ThreeWayResult>
   /** Compare the contents of two archive files (e.g. .zip) as a tree. */
   compareArchives(leftPath: string, rightPath: string): Promise<CompareResult>
   /** Read one entry's content from an archive as text (hex dump when binary). */
@@ -102,6 +121,10 @@ export interface RendererApi {
   cancelCompare(): Promise<void>
   onProgress(cb: (update: ProgressUpdate) => void): () => void
   readFile(path: string): Promise<FileContents>
+  /** Hex dump of a byte window of a (possibly huge) file, plus its total size. */
+  readFileRange(path: string, offset: number, length: number): Promise<HexWindow>
+  /** Byte offset where two files first differ (-1 if identical), with both sizes. */
+  firstDifference(leftPath: string, rightPath: string): Promise<DiffOffset>
   /** Read an image file as a data: URL (or null if too large / unreadable). */
   readImage(path: string): Promise<string | null>
   /** Extract the plain text of a PDF file for text-level comparison. */

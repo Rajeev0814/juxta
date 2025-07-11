@@ -3,7 +3,7 @@ import type { CompareNode, CompareResult, Side } from '../../shared/types'
 import { listChangedFiles } from '../../shared/nav'
 import { planSync, planTimestamp, type SyncMode } from '../../shared/sync'
 import { toHtmlReport, toCsvReport } from '../../shared/report'
-import type { CompareProfile } from '../../shared/settings'
+import type { CompareProfile, ProjectScope } from '../../shared/settings'
 import {
   createSession,
   sessionTitle,
@@ -18,6 +18,7 @@ import { TwoPaneTree } from './components/TwoPaneTree'
 import { FileCompare } from './components/FileCompare'
 import { TextCompare } from './components/TextCompare'
 import { MergeView } from './components/MergeView'
+import { Folder3Compare } from './components/Folder3Compare'
 import { ArchiveCompareView } from './components/ArchiveCompareView'
 import { ImageCompareView } from './components/ImageCompareView'
 import { ExtractedTextCompareView } from './components/ExtractedTextCompareView'
@@ -54,8 +55,10 @@ export default function App(): React.JSX.Element {
   const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
   const [activeId, setActiveId] = useState('session-0')
   const [profiles, setProfiles] = useState<CompareProfile[]>([])
+  const [projectScopes, setProjectScopes] = useState<ProjectScope[]>([])
   const [live, setLive] = useState(false)
   const [mergeRequest, setMergeRequest] = useState<MergeArgs | null>(null)
+  const [threeWayOpen, setThreeWayOpen] = useState(false)
   const [results, setResults] = useState<Record<string, CompareResult | null>>({})
   const [showNew, setShowNew] = useState(false)
 
@@ -112,6 +115,7 @@ export default function App(): React.JSX.Element {
       setHideIdentical(s.hideIdentical)
       setUseTrash(s.useTrash)
       setProfiles(s.profiles)
+      setProjectScopes(s.projectScopes)
       hydratedRef.current = true
     })
     return () => {
@@ -129,11 +133,12 @@ export default function App(): React.JSX.Element {
         hideIdentical,
         useTrash,
         windowBounds: null,
-        profiles
+        profiles,
+        projectScopes
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles])
+  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles, projectScopes])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -238,6 +243,35 @@ export default function App(): React.JSX.Element {
     if (!name) return
     setProfiles((list) => [...list.filter((p) => p.name !== name), { name, options: active.options }])
   }, [active.options])
+
+  // --- Per-project scoping: remember options for a specific folder pair ------
+  const scopeFor = useCallback(
+    (left: string, right: string): ProjectScope | undefined =>
+      projectScopes.find((s) => s.left === left && s.right === right),
+    [projectScopes]
+  )
+
+  const projectPinned =
+    active.type === 'folders' && !!active.leftRoot && !!active.rightRoot && !!scopeFor(active.leftRoot, active.rightRoot)
+
+  const togglePin = useCallback(() => {
+    if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
+    const { leftRoot: left, rightRoot: right, options } = active
+    setProjectScopes((list) => {
+      if (list.some((s) => s.left === left && s.right === right)) {
+        return list.filter((s) => !(s.left === left && s.right === right))
+      }
+      return [...list, { left, right, options: JSON.parse(JSON.stringify(options)) }]
+    })
+  }, [active])
+
+  // Auto-apply a pinned pair's options whenever that pair becomes active.
+  useEffect(() => {
+    if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
+    const scope = scopeFor(active.leftRoot, active.rightRoot)
+    if (scope) updateActive({ options: JSON.parse(JSON.stringify(scope.options)) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active.id, active.leftRoot, active.rightRoot])
 
   const openFile = useCallback((node: CompareNode) => {
     if (node.kind !== 'file') return
@@ -479,6 +513,15 @@ export default function App(): React.JSX.Element {
     )
   }
 
+  // 3-way folder compare overlay (transient; a file merge opens on top of it).
+  if (threeWayOpen) {
+    return (
+      <div className="app">
+        <Folder3Compare theme={theme} onClose={() => setThreeWayOpen(false)} onOpenMerge={setMergeRequest} />
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <div className="tab-bar">
@@ -515,6 +558,14 @@ export default function App(): React.JSX.Element {
                   {SESSION_ICON[t]} {SESSION_LABEL[t]}
                 </button>
               ))}
+              <button
+                onClick={() => {
+                  setShowNew(false)
+                  setThreeWayOpen(true)
+                }}
+              >
+                🔀 3-Way Folders
+              </button>
             </div>
           )}
         </div>
@@ -547,6 +598,8 @@ export default function App(): React.JSX.Element {
             onApplyProfile={applyProfile}
             onSaveProfile={saveProfile}
             onSnapshot={handleSnapshot}
+            projectPinned={projectPinned}
+            onTogglePin={togglePin}
           />
 
           {result && view === 'folder' && (

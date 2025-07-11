@@ -67,6 +67,54 @@ export interface Merge3Result {
   conflicts: number
 }
 
+export type ConflictChoice = 'local' | 'remote' | 'both'
+
+/** Count remaining conflict blocks (lines starting with 7 `<`). */
+export function countConflicts(text: string): number {
+  return toLines(text).filter((l) => /^<{7}/.test(l)).length
+}
+
+/**
+ * Resolve the conflict block containing `lineNumber` (1-based) by keeping the
+ * local side, the remote side, or both — dropping the `<<<<<<< / ======= /
+ * >>>>>>>` markers. Returns the new text, or null if that line isn't inside a
+ * well-formed conflict block.
+ */
+export function resolveConflictAt(text: string, lineNumber: number, choice: ConflictChoice): string | null {
+  const lines = toLines(text)
+  const idx = lineNumber - 1
+  if (idx < 0 || idx >= lines.length) return null
+
+  // Find the opening marker at or above the cursor; bail if a closing marker
+  // sits between (the cursor is below a already-closed block).
+  let start = -1
+  for (let i = idx; i >= 0; i--) {
+    if (i < idx && /^>{7}/.test(lines[i])) break
+    if (/^<{7}/.test(lines[i])) {
+      start = i
+      break
+    }
+  }
+  if (start < 0) return null
+
+  let sep = -1
+  let end = -1
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^<{7}/.test(lines[i])) return null // nested opener -> malformed
+    if (sep < 0 && /^={7}/.test(lines[i])) sep = i
+    else if (sep >= 0 && /^>{7}/.test(lines[i])) {
+      end = i
+      break
+    }
+  }
+  if (sep < 0 || end < 0 || idx > end) return null
+
+  const local = lines.slice(start + 1, sep)
+  const remote = lines.slice(sep + 1, end)
+  const replacement = choice === 'local' ? local : choice === 'remote' ? remote : [...local, ...remote]
+  return [...lines.slice(0, start), ...replacement, ...lines.slice(end + 1)].join('\n')
+}
+
 export function merge3(
   baseText: string,
   localText: string,

@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { DEFAULT_FILTERS, type CompareMethod, type CompareOptions } from '../../../shared/types'
 import type { CompareProfile } from '../../../shared/settings'
 import { FolderPicker } from './FolderPicker'
+import { TypeRulesEditor } from './TypeRulesEditor'
 
 interface Props {
   leftRoot: string
@@ -21,6 +22,9 @@ interface Props {
   onSaveProfile: () => void
   /** Save a snapshot of, or open a snapshot into, the given side. */
   onSnapshot: (action: 'save:left' | 'save:right' | 'open:left' | 'open:right') => void
+  /** Whether the current folder pair has pinned (scoped) options. */
+  projectPinned: boolean
+  onTogglePin: () => void
 }
 
 const METHODS: { value: CompareMethod; label: string }[] = [
@@ -33,6 +37,7 @@ export function Toolbar(props: Props): React.JSX.Element {
   const { options } = props
   // Bumped on "Reset filters" to remount the uncontrolled (defaultValue) inputs.
   const [resetToken, setResetToken] = useState(0)
+  const [showRules, setShowRules] = useState(false)
   const setFilters = (patch: Partial<CompareOptions['filters']>): void =>
     props.onOptions({ ...options, filters: { ...options.filters, ...patch } })
 
@@ -114,6 +119,18 @@ export function Toolbar(props: Props): React.JSX.Element {
           <button onClick={props.onSaveProfile} title="Save current rule + filters as a profile">
             Save profile
           </button>
+          <button
+            className={props.projectPinned ? 'primary' : ''}
+            onClick={props.onTogglePin}
+            disabled={!props.leftRoot || !props.rightRoot}
+            title={
+              props.projectPinned
+                ? 'These options are pinned to this folder pair — click to unpin'
+                : 'Pin the current options to this folder pair (auto-applied next time)'
+            }
+          >
+            {props.projectPinned ? '📌 Pinned' : '📌 Pin pair'}
+          </button>
         </span>
 
         <select
@@ -139,10 +156,26 @@ export function Toolbar(props: Props): React.JSX.Element {
           <option value="open:right">Open snapshot as Right…</option>
         </select>
 
+        <button
+          onClick={() => setShowRules(true)}
+          className={options.filters.typeRules.length ? 'primary' : ''}
+          title="Per-file-type rules (whitespace/case/blank by glob)"
+        >
+          ⚙ Type rules{options.filters.typeRules.length ? ` (${options.filters.typeRules.length})` : ''}
+        </button>
+
         <button onClick={resetFilters} title="Reset all filters & rules to defaults">
           Reset filters
         </button>
       </div>
+
+      {showRules && (
+        <TypeRulesEditor
+          rules={options.filters.typeRules}
+          onChange={(typeRules) => setFilters({ typeRules })}
+          onClose={() => setShowRules(false)}
+        />
+      )}
 
       <div className="toolbar-row filters">
         <label className="opt grow">
@@ -232,6 +265,15 @@ export function Toolbar(props: Props): React.JSX.Element {
             onChange={(e) => setFilters({ normalizeXml: e.target.checked })}
           />
           XML-aware
+        </label>
+
+        <label className="opt checkbox" title="Compare .js/.mjs/.cjs by AST (ignore comments, formatting & quote style)">
+          <input
+            type="checkbox"
+            checked={options.filters.normalizeCode}
+            onChange={(e) => setFilters({ normalizeCode: e.target.checked })}
+          />
+          JS-aware (AST)
         </label>
 
         <label className="opt checkbox" title="Ignore blank / whitespace-only lines when comparing content">

@@ -2,8 +2,10 @@ import { join } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import type { BrowserWindow } from 'electron'
 import { IPC } from '../shared/ipc'
-import type { CompareOptions, CompareResult, ProgressUpdate } from '../shared/types'
+import type { CompareOptions, CompareResult, ProgressUpdate, ThreeWayResult } from '../shared/types'
 import type { Snapshot } from '../shared/snapshot'
+
+type PendingResult = CompareResult | Snapshot | ThreeWayResult
 import type { WorkerMessage, WorkerRequest } from './worker/compareWorker'
 
 export const CANCELLED_MESSAGE = 'Comparison cancelled'
@@ -24,10 +26,7 @@ export interface WorkerLike {
 export class CompareService {
   private worker: WorkerLike | null = null
   private nextId = 1
-  private pending = new Map<
-    number,
-    { resolve: (r: CompareResult | Snapshot) => void; reject: (e: Error) => void }
-  >()
+  private pending = new Map<number, { resolve: (r: PendingResult) => void; reject: (e: Error) => void }>()
 
   /** Path the worker uses to persist the hash cache (set by the main process). */
   cachePath: string | undefined
@@ -51,6 +50,7 @@ export class CompareService {
       if (!entry) return
       this.pending.delete(msg.id)
       if (msg.type === 'result') entry.resolve(msg.result)
+      else if (msg.type === 'result3') entry.resolve(msg.result)
       else if (msg.type === 'snapshot') entry.resolve(msg.snapshot)
       else entry.reject(new Error(msg.message))
     })
@@ -79,8 +79,19 @@ export class CompareService {
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<CompareResult>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (r: CompareResult | Snapshot) => void, reject })
+      this.pending.set(id, { resolve: resolve as (r: PendingResult) => void, reject })
       const req: WorkerRequest = { id, leftRoot, rightRoot, options, cachePath: this.cachePath }
+      worker.postMessage(req)
+    })
+  }
+
+  /** Compare three folders (base/left/right) with 3-way classification. */
+  compare3(baseRoot: string, leftRoot: string, rightRoot: string, options: CompareOptions): Promise<ThreeWayResult> {
+    const worker = this.ensureWorker()
+    const id = this.nextId++
+    return new Promise<ThreeWayResult>((resolve, reject) => {
+      this.pending.set(id, { resolve: resolve as (r: PendingResult) => void, reject })
+      const req: WorkerRequest = { id, kind: 'compare3', baseRoot, leftRoot, rightRoot, options }
       worker.postMessage(req)
     })
   }
@@ -90,7 +101,7 @@ export class CompareService {
     const worker = this.ensureWorker()
     const id = this.nextId++
     return new Promise<Snapshot>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (r: CompareResult | Snapshot) => void, reject })
+      this.pending.set(id, { resolve: resolve as (r: PendingResult) => void, reject })
       const req: WorkerRequest = { id, kind: 'capture', root, options }
       worker.postMessage(req)
     })

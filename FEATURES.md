@@ -14,10 +14,10 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 
 ## B. Beyond Compare parity (core)
 - ✅ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
-- 🟦 B2. 3-way merge — ✅ diff3 auto-merge core + mergetool view (conflict nav, save); ⬜ folder 3-way, in-pane resolve buttons
+- ✅ B2. 3-way merge — diff3 auto-merge + mergetool view (conflict nav, save, in-pane resolve) + folder-level 3-way compare (base/left/right classification; open a file to resolve in the merge view)
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ✅ B4. Moved / renamed detection (match by content hash)
-- 🟦 B5. Ignore-lines — ✅ by-regex + ignore-blank-lines (content hashing); ⬜ per-file-type rule sets
+- ✅ B5. Ignore-lines & rules — by-regex + ignore-blank-lines (content hashing) + per-file-type rule sets (glob → whitespace/case/blank overrides)
 - ✅ B6. Encoding & line-ending — detect UTF-8/UTF-16 + EOL, fix UTF-16 decode, convert EOL (LF/CRLF) on save
 - ✅ B7. Reports & patch — unified-diff "Copy patch" + "Save .patch" + "Apply patch", HTML + CSV report export
 - ✅ B8. Snapshots — capture a folder to a `.juxtasnap` file; compare a live folder (or another snapshot) against it offline
@@ -28,7 +28,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
 - ✅ C3. Table compare — CSV/TSV-aware (ignore row order) + key-column-aligned table view (row/cell diff, auto-detected)
 - ✅ C4. Structured data — JSON-, YAML- & XML-aware compare + key-aligned structured tree view (added/removed/changed per node, raw-text toggle)
-- ⬜ C5. AST / semantic code diff
+- 🟦 C5. AST / semantic code diff — ✅ JS/.mjs/.cjs AST-aware compare (ignore comments/formatting/quote style, via acorn); ⬜ aligned AST diff view, more languages
 - ✅ C6. Document text compare — PDF (pdf-parse) + Office docx/xlsx/pptx text-diff (adm-zip + XML, auto-detected)
 - ✅ C7. Archive browsing — zip-family + tar/tgz/tar.gz; archive ↔ folder compare; drill into an entry to diff its content (text/hex)
 
@@ -42,9 +42,9 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 ## E. Performance & robustness
 - ✅ E1. Persistent hash cache (path+size+mtime+flags keyed)
 - ✅ E2. File-watch / live re-compare (debounced auto-refresh)
-- ⬜ E3. Streaming / byte-range compare for huge files
+- ✅ E3. Huge files — byte-range hex viewer (on-demand windows) + streaming first-difference finder for files over the editor limit
 
 ## F. Differentiators
 - ✅ F1. Diff insights — +added/−removed line stats (file/text) + per-directory churn heatmap in the folder tree
 - ✅ F2. Minimap + overview ruler with diff markers
-- 🟦 F3. Comparison profiles — ✅ save/apply named rule+filter profiles (persisted); ⬜ per-project scoping / cloud sync
+- 🟦 F3. Comparison profiles — ✅ named rule+filter profiles + per-project scoping (pin options to a folder pair, auto-applied); ⬜ cloud sync

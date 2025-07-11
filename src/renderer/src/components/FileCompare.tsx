@@ -5,6 +5,7 @@ import { applyBlock, changedBlockIndices, computeBlocks, diffStats, toUnifiedDif
 import { languageForPath } from '../lib/language'
 import { juxtaTheme } from '../lib/monacoSetup'
 import { convertEol } from '../../../shared/eol'
+import { HugeFileCompareView } from './HugeFileCompareView'
 
 interface Props {
   node: CompareNode
@@ -178,6 +179,11 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
     if (!patch) return
     void window.api.saveText(`${node.name}.patch`, patch)
   }, [buildPatch, node])
+
+  // Files past the editor's size limit fall back to an on-demand hex viewer.
+  if (tooLarge && node.left && node.right) {
+    return <HugeFileCompareView left={node.left.path} right={node.right.path} />
+  }
 
   const loaded = leftText !== null && rightText !== null
   const language = languageForPath(node.left?.path ?? node.right?.path ?? '')

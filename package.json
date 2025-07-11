@@ -80,6 +80,7 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
+    "acorn": "^8.17.0",
     "adm-zip": "^0.5.16",
     "fast-xml-parser": "^4.5.7",
     "monaco-editor": "^0.52.2",

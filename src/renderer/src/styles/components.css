@@ -597,6 +597,43 @@
 .sc-action {
   color: var(--text-dim);
 }
+.type-rules {
+  min-width: 560px;
+}
+.tr-body {
+  padding: 10px 14px;
+  max-height: 50vh;
+  overflow: auto;
+}
+.tr-hint {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.6;
+}
+.tr-hint code {
+  font-family: var(--mono);
+  background: var(--bg-panel);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.tr-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+.tr-glob {
+  width: 140px;
+  font-family: var(--mono);
+}
+.tr-remove {
+  margin-left: auto;
+}
+.tr-footer {
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+}
+
 .shortcuts-table kbd {
   font-family: var(--mono);
   font-size: 11px;
@@ -604,6 +641,75 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 6px;
+}
+
+/* ---------- 3-way folder compare ---------- */
+.three-way {
+  overflow: auto;
+}
+.tw-list {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.tw-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 12px;
+  border-bottom: 1px solid transparent;
+}
+.tw-row:hover {
+  background: var(--row-hover);
+}
+.tw-badge {
+  flex: none;
+  width: 130px;
+  color: var(--text-dim);
+}
+.tw-row.st-left-only .tw-badge {
+  color: var(--st-left-only);
+}
+.tw-row.st-right-only .tw-badge {
+  color: var(--st-right-only);
+}
+.tw-row.st-different .tw-badge {
+  color: var(--st-different);
+}
+.tw-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tw-conflict {
+  color: var(--st-right-only);
+  font-weight: 700;
+}
+.tw-row.tw-conflict {
+  background-color: var(--st-right-only-bg);
+}
+.tw-resolve {
+  margin-left: auto;
+  color: var(--accent);
+  flex: none;
+}
+
+/* ---------- Large-file hex ---------- */
+.huge-hex {
+  display: flex;
+  gap: 1px;
+  overflow: hidden;
+}
+.huge-hex .hex-pane {
+  flex: 1;
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border);
 }
 
 /* ---------- Structured compare ---------- */

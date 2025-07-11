@@ -16,6 +16,8 @@ const api: RendererApi = {
   selectSnapshot: () => ipcRenderer.invoke(IPC.selectSnapshot),
   saveSnapshot: (root, options) => ipcRenderer.invoke(IPC.saveSnapshot, root, options),
   compare: (req: CompareRequest): Promise<CompareResult> => ipcRenderer.invoke(IPC.compare, req),
+  compare3: (baseRoot, leftRoot, rightRoot, options) =>
+    ipcRenderer.invoke(IPC.compare3, baseRoot, leftRoot, rightRoot, options),
   compareArchives: (leftPath: string, rightPath: string): Promise<CompareResult> =>
     ipcRenderer.invoke(IPC.compareArchives, leftPath, rightPath),
   readArchiveEntry: (archivePath: string, relPath: string) =>
@@ -27,6 +29,10 @@ const api: RendererApi = {
     return () => ipcRenderer.removeListener(IPC.compareProgress, listener)
   },
   readFile: (path: string): Promise<FileContents> => ipcRenderer.invoke(IPC.readFile, path),
+  readFileRange: (path: string, offset: number, length: number) =>
+    ipcRenderer.invoke(IPC.readFileRange, path, offset, length),
+  firstDifference: (leftPath: string, rightPath: string) =>
+    ipcRenderer.invoke(IPC.firstDifference, leftPath, rightPath),
   readImage: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.readImage, path),
   readPdfText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readPdfText, path),
   readOfficeText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readOfficeText, path),
