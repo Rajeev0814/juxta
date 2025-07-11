@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { open, readFile, stat, utimes, writeFile } from 'node:fs/promises'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
 import { buildMenuTemplate, type MenuActionId } from './menu'
 import {
@@ -12,7 +12,7 @@ import {
 } from '../shared/ipc'
 import { applyMergePlan, copyEntry, deleteEntry, planMakeMatch, type MergeAction } from '../core/merge'
 import { decodeText, detectEncoding, detectEol, encodingLabel, eolLabel } from '../core/encoding'
-import { toHexDump } from '../core/hex'
+import { firstDifference, toHexDump } from '../core/hex'
 import { readArchiveEntries, readArchiveEntryData } from '../core/archive'
 import { extractOfficeText } from '../core/office'
 import pdfParse from 'pdf-parse/lib/pdf-parse.js'
@@ -172,6 +172,13 @@ function registerIpc(): void {
     return compareService.compare(req.leftRoot, req.rightRoot, req.options)
   })
 
+  ipcMain.handle(
+    IPC.compare3,
+    async (_e, baseRoot: string, leftRoot: string, rightRoot: string, options: CompareOptions) => {
+      return compareService.compare3(baseRoot, leftRoot, rightRoot, options)
+    }
+  )
+
   ipcMain.handle(IPC.cancelCompare, async () => {
     compareService.cancel()
   })
@@ -228,6 +235,51 @@ function registerIpc(): void {
       eol: eolLabel(detectEol(text))
     }
   })
+
+  ipcMain.handle(
+    IPC.readFileRange,
+    async (_e, path: string, offset: number, length: number): Promise<{ hex: string; size: number }> => {
+      const info = await stat(path)
+      const start = Math.max(0, Math.min(offset, info.size))
+      const len = Math.max(0, Math.min(length, info.size - start))
+      const buf = Buffer.alloc(len)
+      if (len > 0) {
+        const fh = await open(path, 'r')
+        try {
+          await fh.read(buf, 0, len, start)
+        } finally {
+          await fh.close()
+        }
+      }
+      return { hex: toHexDump(buf, { startOffset: start }), size: info.size }
+    }
+  )
+
+  ipcMain.handle(
+    IPC.firstDifference,
+    async (_e, leftPath: string, rightPath: string): Promise<{ offset: number; leftSize: number; rightSize: number }> => {
+      const [ls, rs] = await Promise.all([stat(leftPath), stat(rightPath)])
+      const [lh, rh] = await Promise.all([open(leftPath, 'r'), open(rightPath, 'r')])
+      try {
+        const CHUNK = 1 << 20 // 1 MiB
+        const la = Buffer.alloc(CHUNK)
+        const rb = Buffer.alloc(CHUNK)
+        const common = Math.min(ls.size, rs.size)
+        let pos = 0
+        while (pos < common) {
+          const want = Math.min(CHUNK, common - pos)
+          await Promise.all([lh.read(la, 0, want, pos), rh.read(rb, 0, want, pos)])
+          const idx = firstDifference(la.subarray(0, want), rb.subarray(0, want))
+          if (idx !== -1) return { offset: pos + idx, leftSize: ls.size, rightSize: rs.size }
+          pos += want
+        }
+        // Identical over the common prefix; differ only if sizes differ.
+        return { offset: ls.size === rs.size ? -1 : common, leftSize: ls.size, rightSize: rs.size }
+      } finally {
+        await Promise.all([lh.close(), rh.close()])
+      }
+    }
+  )
 
   ipcMain.handle(IPC.readImage, async (_e, path: string): Promise<string | null> => {
     try {

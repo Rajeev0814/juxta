@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toHexDump } from '../src/core/hex'
+import { firstDifference, toHexDump } from '../src/core/hex'
 
 describe('toHexDump', () => {
   it('formats offset, hex bytes and ascii', () => {
@@ -27,5 +27,22 @@ describe('toHexDump', () => {
     expect(out).toContain('… (6 more bytes not shown)')
     // one data row (4 bytes) + the note
     expect(out.split('\n')).toHaveLength(2)
+  })
+
+  it('labels addresses from startOffset for windowed views', () => {
+    const out = toHexDump(Buffer.from('Hi', 'ascii'), { startOffset: 0x1000 })
+    expect(out.startsWith('00001000  48 69')).toBe(true)
+  })
+})
+
+describe('firstDifference', () => {
+  it('finds the first differing byte', () => {
+    expect(firstDifference(Buffer.from('abcXe'), Buffer.from('abcYe'))).toBe(3)
+  })
+  it('returns -1 for identical buffers', () => {
+    expect(firstDifference(Buffer.from('same'), Buffer.from('same'))).toBe(-1)
+  })
+  it('returns the common length when one is a prefix of the other', () => {
+    expect(firstDifference(Buffer.from('abc'), Buffer.from('abcdef'))).toBe(3)
   })
 })

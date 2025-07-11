@@ -2,6 +2,8 @@ import { parentPort } from 'node:worker_threads'
 import { readFile, writeFile } from 'node:fs/promises'
 import { readFileSync } from 'node:fs'
 import { compareFolders, type CompareEngineInput } from '../../core/compare'
+import { compareFolders3 } from '../../core/compare3'
+import type { ThreeWayResult } from '../../shared/types'
 import {
   captureSnapshot,
   rawContentOptions,
@@ -27,10 +29,12 @@ export type WorkerRequest =
       cachePath?: string
     }
   | { id: number; kind: 'capture'; root: string; options: CompareOptions }
+  | { id: number; kind: 'compare3'; baseRoot: string; leftRoot: string; rightRoot: string; options: CompareOptions }
 
 export type WorkerMessage =
   | { type: 'progress'; id: number; update: Parameters<NonNullable<CompareEngineInput['onProgress']>>[0] }
   | { type: 'result'; id: number; result: Awaited<ReturnType<typeof compareFolders>> }
+  | { type: 'result3'; id: number; result: ThreeWayResult }
   | { type: 'snapshot'; id: number; snapshot: Snapshot }
   | { type: 'error'; id: number; message: string }
 
@@ -130,6 +134,16 @@ port.on('message', async (req: WorkerRequest) => {
     if (req.kind === 'capture') {
       const snapshot = await captureSnapshot(req.root, req.options)
       port.postMessage({ type: 'snapshot', id: req.id, snapshot } satisfies WorkerMessage)
+      return
+    }
+    if (req.kind === 'compare3') {
+      const result = await compareFolders3({
+        baseRoot: req.baseRoot,
+        leftRoot: req.leftRoot,
+        rightRoot: req.rightRoot,
+        options: req.options
+      })
+      port.postMessage({ type: 'result3', id: req.id, result } satisfies WorkerMessage)
       return
     }
     await runCompare(req)

@@ -11,7 +11,7 @@ import type {
 } from '../shared/types'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { createWalkMatcher } from './filters'
+import { createWalkMatcher, resolveTypeRules } from './filters'
 import { hashFile } from './hash'
 import { createIgnoreMatcher, type IgnoreMatcher } from './ignore'
 import type { HashCache } from './hashCache'
@@ -35,17 +35,20 @@ async function cachedHash(
   options: CompareOptions,
   cache: HashCache | undefined
 ): Promise<string | undefined> {
-  const ws = options.filters.ignoreWhitespace
-  const ic = options.filters.ignoreCase
+  // Per-file-type rules can override whitespace/case/blank-line handling.
+  const override = resolveTypeRules(entry.relPath, options.filters.typeRules)
+  const ws = override?.ignoreWhitespace ?? options.filters.ignoreWhitespace
+  const ic = override?.ignoreCase ?? options.filters.ignoreCase
+  const ignoreBlankLines = override?.ignoreBlankLines ?? options.filters.ignoreBlankLines
   const pattern = options.filters.ignoreLinePattern
-  const ignoreBlankLines = options.filters.ignoreBlankLines
   const normalizeJson = options.filters.normalizeJson
   const normalizeCsv = options.filters.normalizeCsv
   const normalizeYaml = options.filters.normalizeYaml
   const normalizeXml = options.filters.normalizeXml
+  const normalizeCode = options.filters.normalizeCode
   // The hash cache keys on ws/ic only, so bypass it when a content-transforming
-  // filter (line-ignore regex / blank lines / JSON / CSV / YAML / XML) is active
-  // to avoid stale hits.
+  // filter (line-ignore regex / blank lines / JSON / CSV / YAML / XML / code) or
+  // a per-file-type rule is active, to avoid stale hits.
   const useCache =
     cache &&
     !pattern &&
@@ -53,7 +56,9 @@ async function cachedHash(
     !normalizeJson &&
     !normalizeCsv &&
     !normalizeYaml &&
-    !normalizeXml
+    !normalizeXml &&
+    !normalizeCode &&
+    !override
   const hit = useCache ? cache.get(entry.path, entry.size, entry.mtimeMs, ws, ic) : undefined
   if (hit !== undefined) return hit
   try {
@@ -65,7 +70,8 @@ async function cachedHash(
       normalizeJson,
       normalizeCsv,
       normalizeYaml,
-      normalizeXml
+      normalizeXml,
+      normalizeCode
     })
     if (useCache) cache.set(entry.path, entry.size, entry.mtimeMs, ws, ic, hash)
     return hash
@@ -248,6 +254,8 @@ export async function compareFolders(input: CompareEngineInput): Promise<Compare
         options.filters.normalizeCsv ||
         options.filters.normalizeYaml ||
         options.filters.normalizeXml ||
+        options.filters.normalizeCode ||
+        options.filters.typeRules.length > 0 ||
         sizeMatch
       if (mustHash) {
         toHash.push(m.left, m.right)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { merge3 } from '../src/shared/merge3'
+import { countConflicts, merge3, resolveConflictAt } from '../src/shared/merge3'
 
 describe('merge3', () => {
   it('auto-merges non-overlapping changes on each side', () => {
@@ -47,5 +47,34 @@ describe('merge3', () => {
     const r = merge3('a\nb\nc', 'a\nc', 'a\nb\nc') // local deleted b
     expect(r.conflicts).toBe(0)
     expect(r.merged).toBe('a\nc')
+  })
+})
+
+describe('resolveConflictAt / countConflicts', () => {
+  // line: 1 pre | 2 <<< | 3 L | 4 === | 5 R | 6 >>> | 7 post
+  const conflicted = 'pre\n<<<<<<< LOCAL\nL\n=======\nR\n>>>>>>> REMOTE\npost'
+
+  it('counts conflict blocks', () => {
+    expect(countConflicts(conflicted)).toBe(1)
+    expect(countConflicts('no\nmarkers')).toBe(0)
+  })
+
+  it('keeps the local side and drops the markers', () => {
+    const out = resolveConflictAt(conflicted, 3, 'local')
+    expect(out).toBe('pre\nL\npost')
+    expect(countConflicts(out!)).toBe(0)
+  })
+
+  it('keeps the remote side', () => {
+    expect(resolveConflictAt(conflicted, 5, 'remote')).toBe('pre\nR\npost')
+  })
+
+  it('keeps both sides in order', () => {
+    expect(resolveConflictAt(conflicted, 4, 'both')).toBe('pre\nL\nR\npost')
+  })
+
+  it('returns null for a line outside any conflict block', () => {
+    expect(resolveConflictAt(conflicted, 1, 'local')).toBeNull()
+    expect(resolveConflictAt(conflicted, 7, 'local')).toBeNull()
   })
 })

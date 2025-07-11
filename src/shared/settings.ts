@@ -2,6 +2,7 @@ import {
   DEFAULT_OPTIONS,
   type CompareMethod,
   type CompareOptions,
+  type FileTypeRule,
   type FilterOptions
 } from './types'
 import { createSession, type Session, type SessionType } from './session'
@@ -18,6 +19,13 @@ export interface CompareProfile {
   options: CompareOptions
 }
 
+/** Comparison options remembered for (pinned to) a specific folder pair. */
+export interface ProjectScope {
+  left: string
+  right: string
+  options: CompareOptions
+}
+
 export interface PersistedSettings {
   sessions: Session[]
   activeSessionId: string
@@ -26,6 +34,7 @@ export interface PersistedSettings {
   useTrash: boolean
   windowBounds: WindowBounds | null
   profiles: CompareProfile[]
+  projectScopes: ProjectScope[]
 }
 
 export function defaultSettings(): PersistedSettings {
@@ -37,7 +46,8 @@ export function defaultSettings(): PersistedSettings {
     hideIdentical: false,
     useTrash: true,
     windowBounds: null,
-    profiles: []
+    profiles: [],
+    projectScopes: []
   }
 }
 
@@ -59,6 +69,20 @@ function stringArray(v: unknown, fallback: string[]): string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string') ? (v as string[]) : fallback
 }
 
+function coerceTypeRules(raw: unknown): FileTypeRule[] {
+  if (!Array.isArray(raw)) return []
+  const rules: FileTypeRule[] = []
+  for (const r of raw) {
+    if (!isObject(r) || typeof r.glob !== 'string' || !r.glob.trim()) continue
+    const rule: FileTypeRule = { glob: r.glob }
+    if (typeof r.ignoreWhitespace === 'boolean') rule.ignoreWhitespace = r.ignoreWhitespace
+    if (typeof r.ignoreCase === 'boolean') rule.ignoreCase = r.ignoreCase
+    if (typeof r.ignoreBlankLines === 'boolean') rule.ignoreBlankLines = r.ignoreBlankLines
+    rules.push(rule)
+  }
+  return rules
+}
+
 function coerceFilters(raw: unknown): FilterOptions {
   const d = DEFAULT_OPTIONS.filters
   if (!isObject(raw)) return { ...d }
@@ -73,7 +97,9 @@ function coerceFilters(raw: unknown): FilterOptions {
     normalizeJson: typeof raw.normalizeJson === 'boolean' ? raw.normalizeJson : d.normalizeJson,
     normalizeCsv: typeof raw.normalizeCsv === 'boolean' ? raw.normalizeCsv : d.normalizeCsv,
     normalizeYaml: typeof raw.normalizeYaml === 'boolean' ? raw.normalizeYaml : d.normalizeYaml,
-    normalizeXml: typeof raw.normalizeXml === 'boolean' ? raw.normalizeXml : d.normalizeXml
+    normalizeXml: typeof raw.normalizeXml === 'boolean' ? raw.normalizeXml : d.normalizeXml,
+    normalizeCode: typeof raw.normalizeCode === 'boolean' ? raw.normalizeCode : d.normalizeCode,
+    typeRules: coerceTypeRules(raw.typeRules)
   }
 }
 
@@ -109,6 +135,17 @@ function coerceProfiles(raw: unknown): CompareProfile[] {
   for (const p of raw) {
     if (isObject(p) && typeof p.name === 'string' && p.name) {
       out.push({ name: p.name, options: coerceOptions(p.options) })
+    }
+  }
+  return out
+}
+
+function coerceProjectScopes(raw: unknown): ProjectScope[] {
+  if (!Array.isArray(raw)) return []
+  const out: ProjectScope[] = []
+  for (const p of raw) {
+    if (isObject(p) && typeof p.left === 'string' && typeof p.right === 'string' && p.left && p.right) {
+      out.push({ left: p.left, right: p.right, options: coerceOptions(p.options) })
     }
   }
   return out
@@ -157,5 +194,6 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   if (typeof raw.useTrash === 'boolean') s.useTrash = raw.useTrash
   s.windowBounds = coerceBounds(raw.windowBounds)
   s.profiles = coerceProfiles(raw.profiles)
+  s.projectScopes = coerceProjectScopes(raw.projectScopes)
   return s
 }

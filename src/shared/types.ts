@@ -44,6 +44,18 @@ export interface FilterOptions {
   normalizeYaml: boolean
   /** Compare .xml files by canonical form (ignore formatting & attribute/key order). */
   normalizeXml: boolean
+  /** Compare .js/.mjs/.cjs files by AST (ignore comments, formatting & quote style). */
+  normalizeCode: boolean
+  /** Per-file-type overrides applied to files matching a glob (later rules win). */
+  typeRules: FileTypeRule[]
+}
+
+/** A comparison override bound to files matching `glob` (e.g. "*.md", "*.min.js"). */
+export interface FileTypeRule {
+  glob: string
+  ignoreWhitespace?: boolean
+  ignoreCase?: boolean
+  ignoreBlankLines?: boolean
 }
 
 export interface CompareOptions {
@@ -90,6 +102,48 @@ export interface MovePair {
   to: string // right-side relPath
 }
 
+/** Per-file classification of a 3-way (base / left / right) folder comparison. */
+export type ThreeWayStatus =
+  | 'unchanged'
+  | 'modifiedLeft' // only left changed vs base
+  | 'modifiedRight' // only right changed vs base
+  | 'modifiedBoth' // both changed identically (also used for "dir has changes")
+  | 'addedLeft'
+  | 'addedRight'
+  | 'addedBoth' // both added the same content
+  | 'deletedLeft' // removed on the left (present in base+right)
+  | 'deletedRight'
+  | 'deletedBoth'
+  | 'conflict' // both changed differently, or change-vs-delete, or added differently
+
+export interface ThreeWayNode {
+  name: string
+  relPath: string
+  kind: EntryKind
+  status: ThreeWayStatus
+  base?: SideInfo
+  left?: SideInfo
+  right?: SideInfo
+  children?: ThreeWayNode[]
+}
+
+export interface ThreeWaySummary {
+  unchanged: number
+  modified: number
+  added: number
+  deleted: number
+  conflicts: number
+  totalFiles: number
+}
+
+export interface ThreeWayResult {
+  baseRoot: string
+  leftRoot: string
+  rightRoot: string
+  root: ThreeWayNode
+  summary: ThreeWaySummary
+}
+
 export interface CompareResult {
   leftRoot: string
   rightRoot: string
@@ -120,7 +174,9 @@ export const DEFAULT_FILTERS: FilterOptions = {
   normalizeJson: false,
   normalizeCsv: false,
   normalizeYaml: false,
-  normalizeXml: false
+  normalizeXml: false,
+  normalizeCode: false,
+  typeRules: []
 }
 
 export const DEFAULT_OPTIONS: CompareOptions = {
