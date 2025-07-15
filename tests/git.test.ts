@@ -43,4 +43,8 @@ describe('gitMergeToolCommands', () => {
     expect(out).toContain('git config --global merge.tool juxta')
     expect(out).toContain('--git-merge "$BASE" "$LOCAL" "$REMOTE" "$MERGED"')
   })
+
+  it('does not trust the exit code (async GUI — git prompts for success)', () => {
+    expect(gitMergeToolCommands('C:\\Juxta.exe')).toContain('mergetool.juxta.trustExitCode false')
+  })
 })

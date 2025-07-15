@@ -4,13 +4,16 @@
 // parsers (yaml, fast-xml-parser) are browser-safe and bundle into the renderer.
 import { parse as parseYaml } from 'yaml'
 import { XMLParser } from 'fast-xml-parser'
+import { astToPlain, isCodePath } from './jsast'
 
-export type StructKind = 'json' | 'yaml' | 'xml'
+// 'js' covers all JS/TS-family code (js/mjs/cjs/jsx/ts/mts/cts/tsx).
+export type StructKind = 'json' | 'yaml' | 'xml' | 'js'
 
 export function structKind(path: string): StructKind | null {
   if (/\.json$/i.test(path)) return 'json'
   if (/\.ya?ml$/i.test(path)) return 'yaml'
   if (/\.xml$/i.test(path)) return 'xml'
+  if (isCodePath(path)) return 'js'
   return null
 }
 
@@ -21,11 +24,19 @@ const xmlParser = new XMLParser({
   trimValues: true
 })
 
-/** Parse text into a plain JS value for the given kind, or return an error. */
-export function parseStructured(text: string, kind: StructKind): { value: unknown } | { error: string } {
+/**
+ * Parse text into a plain JS value for the given kind, or return an error.
+ * `path` is used for code (to pick the JS vs TS parser).
+ */
+export function parseStructured(
+  text: string,
+  kind: StructKind,
+  path = 'x.js'
+): { value: unknown } | { error: string } {
   try {
     if (kind === 'json') return { value: JSON.parse(text) }
     if (kind === 'yaml') return { value: parseYaml(text) }
+    if (kind === 'js') return { value: astToPlain(text, path) }
     return { value: xmlParser.parse(text) }
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) }

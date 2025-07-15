@@ -267,13 +267,13 @@ export function Toolbar(props: Props): React.JSX.Element {
           XML-aware
         </label>
 
-        <label className="opt checkbox" title="Compare .js/.mjs/.cjs by AST (ignore comments, formatting & quote style)">
+        <label className="opt checkbox" title="Compare JS/TS (js/mjs/cjs/jsx/ts/mts/cts/tsx) by AST (ignore comments, formatting & quote style)">
           <input
             type="checkbox"
             checked={options.filters.normalizeCode}
             onChange={(e) => setFilters({ normalizeCode: e.target.checked })}
           />
-          JS-aware (AST)
+          JS/TS-aware (AST)
         </label>
 
         <label className="opt checkbox" title="Ignore blank / whitespace-only lines when comparing content">

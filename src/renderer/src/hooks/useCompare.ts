@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { CompareOptions, CompareResult, ProgressUpdate } from '../../../shared/types'
+import { isFtpUrl } from '../../../shared/ftp'
 
 export interface CompareState {
   comparing: boolean
   progress: ProgressUpdate | null
   error: string | null
   /** Runs a comparison and resolves with the result (or null on error/cancel). */
-  run: (leftRoot: string, rightRoot: string, options: CompareOptions) => Promise<CompareResult | null>
+  run: (
+    leftRoot: string,
+    rightRoot: string,
+    options: CompareOptions,
+    password?: string
+  ) => Promise<CompareResult | null>
   cancel: () => void
 }
 
@@ -20,11 +26,20 @@ export function useCompare(): CompareState {
   }, [])
 
   const run = useCallback(
-    async (leftRoot: string, rightRoot: string, options: CompareOptions): Promise<CompareResult | null> => {
+    async (
+      leftRoot: string,
+      rightRoot: string,
+      options: CompareOptions,
+      password?: string
+    ): Promise<CompareResult | null> => {
       setComparing(true)
       setError(null)
       setProgress({ phase: 'walking', processed: 0, total: 0 })
       try {
+        // A side given as ftp:// is mirrored to a temp folder in main, then compared.
+        if (isFtpUrl(leftRoot) || isFtpUrl(rightRoot)) {
+          return await window.api.compareRemote(leftRoot, rightRoot, options, password)
+        }
         return await window.api.compare({ leftRoot, rightRoot, options })
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)

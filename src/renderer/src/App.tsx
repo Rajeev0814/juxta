@@ -31,6 +31,8 @@ import { isPdfPath } from '../../shared/pdf'
 import { isOfficePath } from '../../shared/office'
 import { isTablePath } from '../../shared/csv'
 import { structKind } from '../../shared/structured'
+import { isFtpUrl, needsPasswordPrompt } from '../../shared/ftp'
+import { PasswordPrompt } from './components/PasswordPrompt'
 import type { MergeArgs } from '../../shared/git'
 import { StatusBar } from './components/StatusBar'
 import { useCompare } from './hooks/useCompare'
@@ -68,6 +70,7 @@ export default function App(): React.JSX.Element {
   const [selectedRelPath, setSelectedRelPath] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [showHelp, setShowHelp] = useState(false)
+  const [passwordFor, setPasswordFor] = useState<string | null>(null)
   const [reveal, setReveal] = useState<{ relPath: string; nonce: number } | null>(null)
   const [expandSignal, setExpandSignal] = useState<{ mode: 'all' | 'none' | 'default'; nonce: number } | null>(null)
   const navPosRef = useRef(-1)
@@ -164,6 +167,21 @@ export default function App(): React.JSX.Element {
     setActiveId(s.id)
   }, [])
 
+  // Open a Folder Compare tab with two roots (used by the Explorer context menu).
+  const openFoldersSession = useCallback((left: string, right: string): void => {
+    const s = { ...createSession('folders', genId()), leftRoot: left, rightRoot: right }
+    setSessions((list) => [...list, s])
+    setActiveId(s.id)
+  }, [])
+
+  const openShellCompare = useCallback(
+    (c: { kind: 'files' | 'folders'; left: string; right: string }): void => {
+      if (c.kind === 'folders') openFoldersSession(c.left, c.right)
+      else openFilesSession(c.left, c.right)
+    },
+    [openFilesSession, openFoldersSession]
+  )
+
   const closeSession = useCallback(
     (id: string): void => {
       setSessions((list) => {
@@ -186,19 +204,52 @@ export default function App(): React.JSX.Element {
   )
 
   // --- Folder comparison ----------------------------------------------------
+  const execCompare = useCallback(
+    async (password?: string) => {
+      if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
+      const res = await run(active.leftRoot, active.rightRoot, active.options, password)
+      if (res) setResults((r) => ({ ...r, [active.id]: res }))
+    },
+    [active, run]
+  )
+
+  /** The remote side needing a password prompt, or '' if none. */
+  const remoteNeedingPassword = (): string => {
+    const remote = isFtpUrl(active.leftRoot) ? active.leftRoot : isFtpUrl(active.rightRoot) ? active.rightRoot : ''
+    return remote && needsPasswordPrompt(remote) ? remote : ''
+  }
+
   const runCompare = useCallback(async () => {
     if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
     setView('folder')
     setActiveNode(null)
-    const res = await run(active.leftRoot, active.rightRoot, active.options)
-    if (res) setResults((r) => ({ ...r, [active.id]: res }))
-  }, [active, run])
+    const remote = remoteNeedingPassword()
+    if (remote) {
+      setPasswordFor(remote)
+      return
+    }
+    await execCompare()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, execCompare])
 
   const refresh = useCallback(async () => {
     if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
-    const res = await run(active.leftRoot, active.rightRoot, active.options)
-    if (res) setResults((r) => ({ ...r, [active.id]: res }))
-  }, [active, run])
+    const remote = remoteNeedingPassword()
+    if (remote) {
+      setPasswordFor(remote)
+      return
+    }
+    await execCompare()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active, execCompare])
+
+  const submitPassword = useCallback(
+    (pw: string) => {
+      setPasswordFor(null)
+      void execCompare(pw)
+    },
+    [execCompare]
+  )
 
   const swapSides = useCallback(() => {
     updateActive({
@@ -389,18 +440,29 @@ export default function App(): React.JSX.Element {
     void window.api.getLaunchMerge().then((m) => {
       if (m) setMergeRequest(m)
     })
+    void window.api.getLaunchCompare().then((c) => {
+      if (c) openShellCompare(c)
+    })
     const offDiff = window.api.onOpenDiff((pair) => openFilesSession(pair.left, pair.right))
     const offMerge = window.api.onOpenMerge((m) => setMergeRequest(m))
+    const offCompare = window.api.onOpenCompare((c) => openShellCompare(c))
     return () => {
       offDiff()
       offMerge()
+      offCompare()
     }
-  }, [openFilesSession])
+  }, [openFilesSession, openShellCompare])
 
   // --- Live re-compare: watch the active folder roots while enabled --------
   useEffect(() => {
+    // Don't try to fs.watch a remote (ftp://) root.
     const watchable =
-      live && active.type === 'folders' && active.leftRoot && active.rightRoot
+      live &&
+      active.type === 'folders' &&
+      active.leftRoot &&
+      active.rightRoot &&
+      !isFtpUrl(active.leftRoot) &&
+      !isFtpUrl(active.rightRoot)
         ? [active.leftRoot, active.rightRoot]
         : null
     void window.api.setWatch(watchable)
@@ -444,7 +506,7 @@ export default function App(): React.JSX.Element {
           void window.api.getGitSetup().then((cmds) => {
             void window.api.writeClipboard(cmds)
             window.alert(
-              'Run these in a shell (e.g. Git Bash) to use Juxta with `git difftool` — copied to your clipboard:\n\n' +
+              'Run these in a shell (e.g. Git Bash) to use Juxta with `git difftool` and `git mergetool` — copied to your clipboard:\n\n' +
                 cmds
             )
           })
@@ -782,7 +844,7 @@ export default function App(): React.JSX.Element {
                   <br />
                   📊 <b>tables</b> (csv/tsv) → key-aligned row/cell compare
                   <br />
-                  🧩 <b>structured</b> (json/yaml/xml) → key-aligned tree (or raw text)
+                  🧩 <b>structured</b> (json/yaml/xml) → key-aligned tree · <b>js/ts</b> (+jsx/tsx) → text + AST toggle
                   <br />
                   📝 anything else → text / hex diff
                 </p>
@@ -819,6 +881,9 @@ export default function App(): React.JSX.Element {
       />
 
       {showHelp && <ShortcutsHelp onClose={() => setShowHelp(false)} />}
+      {passwordFor && (
+        <PasswordPrompt target={passwordFor} onSubmit={submitPassword} onCancel={() => setPasswordFor(null)} />
+      )}
     </div>
   )
 }

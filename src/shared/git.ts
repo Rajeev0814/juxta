@@ -22,13 +22,19 @@ export function parseGitMergeArgs(argv: string[]): MergeArgs | null {
   return null
 }
 
-/** git config commands to register Juxta as the external merge tool. */
+/**
+ * git config commands to register Juxta as the external merge tool. Juxta is a
+ * single-instance GUI: the launched process forwards the merge to the running
+ * window and returns immediately, so its exit code can't signal success. We set
+ * `trustExitCode false` so git prompts "Was the merge successful?" after you
+ * save MERGED and answer — rather than assuming success the instant it launches.
+ */
 export function gitMergeToolCommands(exePath: string): string {
   const exe = exePath.replace(/\\/g, '/')
   return [
     'git config --global merge.tool juxta',
     `git config --global mergetool.juxta.cmd '"${exe}" --git-merge "$BASE" "$LOCAL" "$REMOTE" "$MERGED"'`,
-    'git config --global mergetool.juxta.trustExitCode true'
+    'git config --global mergetool.juxta.trustExitCode false'
   ].join('\n')
 }
 
