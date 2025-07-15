@@ -28,15 +28,15 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
 - ✅ C3. Table compare — CSV/TSV-aware (ignore row order) + key-column-aligned table view (row/cell diff, auto-detected)
 - ✅ C4. Structured data — JSON-, YAML- & XML-aware compare + key-aligned structured tree view (added/removed/changed per node, raw-text toggle)
-- 🟦 C5. AST / semantic code diff — ✅ JS/.mjs/.cjs AST-aware compare (ignore comments/formatting/quote style, via acorn); ⬜ aligned AST diff view, more languages
+- 🟦 C5. AST / semantic code diff — ✅ JS/TS family (js/mjs/cjs/jsx/ts/mts/cts/tsx) AST-aware compare + aligned AST tree view (text ⇄ AST toggle), via acorn + acorn-typescript/acorn-jsx; ⬜ non-JS languages (Python/… need native parsers)
 - ✅ C6. Document text compare — PDF (pdf-parse) + Office docx/xlsx/pptx text-diff (adm-zip + XML, auto-detected)
 - ✅ C7. Archive browsing — zip-family + tar/tgz/tar.gz; archive ↔ folder compare; drill into an entry to diff its content (text/hex)
 
 ## D. Remote & integration
-- ⬜ D1. Remote folders (SFTP/FTP, S3, ...)
-- 🟦 D2. Git — ✅ difftool (open `--git-diff` pairs, single-instance, setup helper); ⬜ mergetool (needs 3-way)
-- ⬜ D3. CLI invocation + automation API
-- ⬜ D4. OS shell integration (context menu)
+- 🟦 D1. Remote folders — ✅ FTP/FTPS: put an `ftp://` URL on a Folder Compare side; it mirrors to a temp folder then runs the normal compare (basic-ftp, injectable/tested); ⬜ SFTP, S3, live two-way sync (need engine VFS)
+- ✅ D2. Git — difftool + mergetool (`--git-diff` / `--git-merge`, single-instance forwarding, setup helper; mergetool uses trustExitCode=false so git prompts after the async GUI resolve)
+- 🟦 D3. CLI — ✅ headless folder compare (`--cli L R [--out .html/.csv] [--method] [--include/--exclude]`), summary to stdout, HTML/CSV report, exit code 0/1/2; ⬜ richer console output on packaged Windows (GUI-subsystem has no attached console)
+- ✅ D4. OS shell integration — Explorer right-click "Juxta: Select Left" + "Compare with Selected" for files & folders (installer registers HKCU verbs; two-step launch opens the right compare)
 - ⬜ D5. Plugin system
 
 ## E. Performance & robustness

@@ -1,12 +1,7 @@
 import { DiffEditor } from '@monaco-editor/react'
 import React, { useEffect, useMemo, useState } from 'react'
-import {
-  diffStructured,
-  parseStructured,
-  structKind,
-  type StructKind,
-  type StructNode
-} from '../../../shared/structured'
+import { diffStructured, parseStructured, structKind, type StructNode } from '../../../shared/structured'
+import { codeLanguage } from '../../../shared/jsast'
 import { juxtaTheme } from '../lib/monacoSetup'
 
 interface Props {
@@ -16,7 +11,10 @@ interface Props {
   hideIdentical: boolean
 }
 
-const MONACO_LANG: Record<StructKind, string> = { json: 'json', yaml: 'yaml', xml: 'xml' }
+function monacoLang(kind: string, path: string): string {
+  if (kind === 'js') return codeLanguage(path) // javascript | typescript
+  return kind // json | yaml | xml
+}
 
 function scalar(v: unknown): string {
   if (v === undefined) return ''
@@ -64,10 +62,13 @@ function allContainerPaths(node: StructNode): string[] {
 /** Key-aligned structured comparison for JSON / YAML / XML documents. */
 export function StructuredCompareView({ left, right, theme, hideIdentical }: Props): React.JSX.Element {
   const kind = structKind(left) ?? 'json'
+  const kindLabel = kind === 'js' ? (codeLanguage(left) === 'typescript' ? 'TS' : 'JS') : kind.toUpperCase()
   const [leftText, setLeftText] = useState<string | null>(null)
   const [rightText, setRightText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [mode, setMode] = useState<'tree' | 'raw'>('tree')
+  // JS/AST trees are verbose, so code defaults to raw text (tree is a toggle);
+  // data formats default to the structured tree.
+  const [mode, setMode] = useState<'tree' | 'raw'>(kind === 'js' ? 'raw' : 'tree')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -92,12 +93,12 @@ export function StructuredCompareView({ left, right, theme, hideIdentical }: Pro
 
   const parsed = useMemo(() => {
     if (leftText === null || rightText === null) return null
-    const l = parseStructured(leftText, kind)
-    const r = parseStructured(rightText, kind)
+    const l = parseStructured(leftText, kind, left)
+    const r = parseStructured(rightText, kind, right)
     if ('error' in l) return { parseError: `left: ${l.error}` }
     if ('error' in r) return { parseError: `right: ${r.error}` }
     return { tree: diffStructured(l.value, r.value) }
-  }, [leftText, rightText, kind])
+  }, [leftText, rightText, kind, left, right])
 
   const tree = parsed && 'tree' in parsed ? parsed.tree : null
   const parseError = parsed && 'parseError' in parsed ? parsed.parseError : null
@@ -129,8 +130,8 @@ export function StructuredCompareView({ left, right, theme, hideIdentical }: Pro
     <div className="file-compare">
       <div className="file-compare-bar">
         <span className="fc-name">Structured Compare</span>
-        <span className="fc-enc">{kind.toUpperCase()}</span>
-        {parseError && <span className="fc-hint error">Can’t parse as {kind.toUpperCase()}: {parseError}</span>}
+        <span className="fc-enc">{kindLabel}</span>
+        {parseError && <span className="fc-hint error">Can’t parse as {kindLabel}: {parseError}</span>}
         <div className="fc-actions">
           <button
             className={effectiveMode === 'tree' ? 'primary' : ''}
@@ -138,7 +139,7 @@ export function StructuredCompareView({ left, right, theme, hideIdentical }: Pro
             onClick={() => setMode('tree')}
             title={parseError ? 'Parsing failed — raw text only' : 'Key-aligned structured tree'}
           >
-            ⊟ Structured
+            ⊟ {kind === 'js' ? 'AST' : 'Structured'}
           </button>
           <button
             className={effectiveMode === 'raw' ? 'primary' : ''}
@@ -155,7 +156,7 @@ export function StructuredCompareView({ left, right, theme, hideIdentical }: Pro
           <DiffEditor
             original={leftText}
             modified={rightText}
-            language={MONACO_LANG[kind]}
+            language={monacoLang(kind, left)}
             theme={juxtaTheme(theme)}
             options={{
               readOnly: true,

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { isArchivePath } from '../../../shared/archive'
 import { isSnapshotPath } from '../../../shared/snapshot'
+import { isFtpUrl } from '../../../shared/ftp'
 
 interface Props {
   label: string
@@ -12,6 +13,7 @@ interface Props {
 
 /** Icon hinting what this side currently resolves to. */
 function sideIcon(value: string, file: boolean): { icon: string; title: string } {
+  if (value && isFtpUrl(value)) return { icon: '🌐', title: 'Remote (FTP)' }
   if (value && isSnapshotPath(value)) return { icon: '📸', title: 'Snapshot' }
   if (value && isArchivePath(value)) return { icon: '🗜', title: 'Archive' }
   return file ? { icon: '📄', title: 'File' } : { icon: '📁', title: 'Folder' }

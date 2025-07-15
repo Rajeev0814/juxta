@@ -6,6 +6,7 @@ import { canonicalizeCsv } from './csv'
 import { canonicalizeYaml } from './yaml'
 import { canonicalizeXml } from './xml'
 import { canonicalizeCode } from './code'
+import { isCodePath } from '../shared/jsast'
 
 export interface HashOptions {
   ignoreWhitespace: boolean
@@ -85,7 +86,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
   const wantJson = !!options.normalizeJson && /\.json$/i.test(filePath)
   const wantYaml = !!options.normalizeYaml && /\.ya?ml$/i.test(filePath)
   const wantXml = !!options.normalizeXml && /\.xml$/i.test(filePath)
-  const wantCode = !!options.normalizeCode && /\.(js|mjs|cjs)$/i.test(filePath)
+  const wantCode = !!options.normalizeCode && isCodePath(filePath)
   const csvDelimiter = /\.tsv$/i.test(filePath) ? '\t' : /\.csv$/i.test(filePath) ? ',' : null
   const wantCsv = !!options.normalizeCsv && csvDelimiter !== null
   if (
@@ -133,7 +134,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
   }
 
   if (wantCode) {
-    const canonical = canonicalizeCode(text)
+    const canonical = canonicalizeCode(text, filePath)
     if (canonical !== null) {
       const out = options.ignoreCase ? canonical.toLowerCase() : canonical
       return createHash('sha1').update(out).digest('hex')

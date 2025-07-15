@@ -18,6 +18,8 @@ const api: RendererApi = {
   compare: (req: CompareRequest): Promise<CompareResult> => ipcRenderer.invoke(IPC.compare, req),
   compare3: (baseRoot, leftRoot, rightRoot, options) =>
     ipcRenderer.invoke(IPC.compare3, baseRoot, leftRoot, rightRoot, options),
+  compareRemote: (leftRoot, rightRoot, options, password) =>
+    ipcRenderer.invoke(IPC.compareRemote, leftRoot, rightRoot, options, password),
   compareArchives: (leftPath: string, rightPath: string): Promise<CompareResult> =>
     ipcRenderer.invoke(IPC.compareArchives, leftPath, rightPath),
   readArchiveEntry: (archivePath: string, relPath: string) =>
@@ -73,6 +75,12 @@ const api: RendererApi = {
     const listener = (_e: unknown, args: import('../shared/git').MergeArgs): void => cb(args)
     ipcRenderer.on(IPC.openMerge, listener)
     return () => ipcRenderer.removeListener(IPC.openMerge, listener)
+  },
+  getLaunchCompare: () => ipcRenderer.invoke(IPC.getLaunchCompare),
+  onOpenCompare: (cb: (c: import('../shared/ipc').ShellCompare) => void) => {
+    const listener = (_e: unknown, c: import('../shared/ipc').ShellCompare): void => cb(c)
+    ipcRenderer.on(IPC.openCompare, listener)
+    return () => ipcRenderer.removeListener(IPC.openCompare, listener)
   }
 }
 

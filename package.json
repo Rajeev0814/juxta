@@ -72,7 +72,8 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Juxta",
       "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico"
+      "uninstallerIcon": "build/icon.ico",
+      "include": "build/installer.nsh"
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
@@ -81,7 +82,10 @@
   "dependencies": {
     "@monaco-editor/react": "^4.6.0",
     "acorn": "^8.17.0",
+    "acorn-jsx": "^5.3.2",
+    "acorn-typescript": "^1.4.13",
     "adm-zip": "^0.5.16",
+    "basic-ftp": "^6.0.1",
     "fast-xml-parser": "^4.5.7",
     "monaco-editor": "^0.52.2",
     "pdf-parse": "^1.1.1",

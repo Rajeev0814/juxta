@@ -1,5 +1,8 @@
 import { join } from 'node:path'
-import { open, readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { mkdtemp, open, readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { Client as FtpClient } from 'basic-ftp'
+import { readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { app, BrowserWindow, clipboard, dialog, ipcMain, Menu, nativeTheme, screen, shell } from 'electron'
 import { buildMenuTemplate, type MenuActionId } from './menu'
 import {
@@ -24,6 +27,13 @@ import { loadSettings, saveSettings } from './settings'
 import { CompareService } from './compareService'
 import { FolderWatcher } from './watchService'
 import { gitDiffToolCommands, gitMergeToolCommands, parseGitDiffArgs, parseGitMergeArgs } from '../shared/git'
+import { parseCompareWith, parseSelectLeft } from '../shared/shell'
+import type { ShellCompare } from '../shared/ipc'
+import { parseCliArgs, type CliOptions } from '../shared/cli'
+import { compareFolders } from '../core/compare'
+import { toCsvReport, toHtmlReport } from '../shared/report'
+import { isFtpUrl, parseFtpUrl } from '../shared/ftp'
+import { mirrorRemote, type RemoteFs } from '../core/ftpMirror'
 
 const isDev = !app.isPackaged
 /** Files above this size are not loaded into the diff editor. */
@@ -39,22 +49,112 @@ const folderWatcher = new FolderWatcher(() => mainWindow?.webContents.send(IPC.w
 const launchDiff = parseGitDiffArgs(process.argv)
 const launchMerge = parseGitMergeArgs(process.argv)
 
-// Single-instance: a second launch (e.g. git difftool on the next file) reuses
-// this window and opens the new pair as a tab instead of spawning a process.
-const gotSingleInstanceLock = app.requestSingleInstanceLock()
-if (!gotSingleInstanceLock) {
-  app.quit()
-} else {
-  app.on('second-instance', (_e, argv) => {
-    const pair = parseGitDiffArgs(argv)
-    const merge = parseGitMergeArgs(argv)
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore()
-      mainWindow.focus()
-      if (merge) mainWindow.webContents.send(IPC.openMerge, merge)
-      else if (pair) mainWindow.webContents.send(IPC.openDiff, pair)
+/** Headless CLI invocation (`--cli <left> <right> …`), or null for a GUI launch. */
+const cliMode = parseCliArgs(process.argv)
+
+/**
+ * Run a headless folder comparison and exit with a status code (0 = identical,
+ * 1 = differences, 2 = error). On Windows a GUI-subsystem exe may not attach to
+ * the parent console, so `--out <file>` and the exit code are the reliable
+ * outputs; the stdout summary shows when launched from a real terminal / node.
+ */
+async function runCli(cli: CliOptions): Promise<void> {
+  try {
+    const options = {
+      method: cli.method ?? 'content',
+      filters: {
+        ...DEFAULT_OPTIONS.filters,
+        includeGlobs: cli.include ?? DEFAULT_OPTIONS.filters.includeGlobs,
+        excludeGlobs: cli.exclude ?? DEFAULT_OPTIONS.filters.excludeGlobs
+      }
     }
-  })
+    const result = await compareFolders({ leftRoot: cli.left, rightRoot: cli.right, options })
+    const s = result.summary
+    process.stdout.write(
+      `different=${s.different} leftOnly=${s.leftOnly} rightOnly=${s.rightOnly} ` +
+        `moved=${s.moved} identical=${s.identical} files=${s.totalFiles}\n`
+    )
+    if (cli.out) {
+      const content = /\.csv$/i.test(cli.out) ? toCsvReport(result) : toHtmlReport(result)
+      await writeFile(cli.out, content, 'utf8')
+      process.stdout.write(`report written: ${cli.out}\n`)
+    }
+    const differs = s.different + s.leftOnly + s.rightOnly > 0
+    app.exit(differs ? 1 : 0)
+  } catch (err) {
+    process.stderr.write(`juxta: ${err instanceof Error ? err.message : String(err)}\n`)
+    app.exit(2)
+  }
+}
+
+/** Where the Explorer "Select Left" verb stashes the pending left-hand path. */
+function pendingComparePath(): string {
+  return join(app.getPath('userData'), 'compare-pending.txt')
+}
+
+function isDir(p: string): boolean {
+  try {
+    return statSync(p).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+/** Resolve a `--juxta-compare <path>` launch against the remembered left side. */
+function shellCompareFrom(argv: string[]): ShellCompare | null {
+  const right = parseCompareWith(argv)
+  if (!right) return null
+  let left = ''
+  try {
+    left = readFileSync(pendingComparePath(), 'utf8').trim()
+  } catch {
+    /* nothing selected */
+  }
+  try {
+    unlinkSync(pendingComparePath())
+  } catch {
+    /* already gone */
+  }
+  if (!left) return null
+  return { kind: isDir(left) && isDir(right) ? 'folders' : 'files', left, right }
+}
+
+// "Select Left" just records the path and exits — no window, no instance lock.
+const selectLeft = parseSelectLeft(process.argv)
+if (selectLeft) {
+  try {
+    writeFileSync(pendingComparePath(), selectLeft, 'utf8')
+  } catch {
+    /* best effort */
+  }
+  app.quit()
+}
+
+// A shell "Compare with Selected" this process was launched with.
+let launchCompare: ShellCompare | null = selectLeft ? null : shellCompareFrom(process.argv)
+
+// Single-instance: a second launch (e.g. git difftool on the next file, or an
+// Explorer "Compare with" verb) reuses this window and opens a new tab.
+// CLI mode exits via runCli, and "select left" already quit above; only a real
+// GUI launch takes the single-instance lock (a lost lock means another instance
+// is running, so forward and quit).
+if (!selectLeft && !cliMode) {
+  if (!app.requestSingleInstanceLock()) {
+    app.quit()
+  } else {
+    app.on('second-instance', (_e, argv) => {
+      const pair = parseGitDiffArgs(argv)
+      const merge = parseGitMergeArgs(argv)
+      const shell = shellCompareFrom(argv)
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore()
+        mainWindow.focus()
+        if (merge) mainWindow.webContents.send(IPC.openMerge, merge)
+        else if (pair) mainWindow.webContents.send(IPC.openDiff, pair)
+        else if (shell) mainWindow.webContents.send(IPC.openCompare, shell)
+      }
+    })
+  }
 }
 
 /** Clamp saved bounds onto the current display so the window is always visible. */
@@ -176,6 +276,51 @@ function registerIpc(): void {
     IPC.compare3,
     async (_e, baseRoot: string, leftRoot: string, rightRoot: string, options: CompareOptions) => {
       return compareService.compare3(baseRoot, leftRoot, rightRoot, options)
+    }
+  )
+
+  ipcMain.handle(
+    IPC.compareRemote,
+    async (_e, leftRoot: string, rightRoot: string, options: CompareOptions, password?: string): Promise<CompareResult> => {
+      const remoteUrl = isFtpUrl(leftRoot) ? leftRoot : isFtpUrl(rightRoot) ? rightRoot : null
+      if (!remoteUrl) return compareService.compare(leftRoot, rightRoot, options)
+      const cfg = parseFtpUrl(remoteUrl)
+      if (!cfg) throw new Error(`Invalid FTP URL: ${remoteUrl}`)
+      // A password entered at connect time (not persisted in the URL) wins.
+      if (password) cfg.password = password
+
+      // Mirror the remote tree into a temp folder, then compare it locally.
+      const temp = await mkdtemp(join(tmpdir(), 'juxta-ftp-'))
+      const client = new FtpClient()
+      try {
+        await client.access({
+          host: cfg.host,
+          port: cfg.port,
+          user: cfg.user,
+          password: cfg.password,
+          secure: cfg.secure
+        })
+        const rfs: RemoteFs = {
+          list: async (dir) => (await client.list(dir)).map((f) => ({ name: f.name, isDir: f.isDirectory })),
+          download: async (remote, local) => {
+            await client.downloadTo(local, remote)
+          }
+        }
+        await mirrorRemote(rfs, cfg.path || '/', temp)
+      } finally {
+        client.close()
+      }
+
+      const remoteIsLeft = remoteUrl === leftRoot
+      const result = await compareService.compare(
+        remoteIsLeft ? temp : leftRoot,
+        remoteIsLeft ? rightRoot : temp,
+        options
+      )
+      // Relabel the mirrored side back to the URL for display.
+      if (remoteIsLeft) result.leftRoot = remoteUrl
+      else result.rightRoot = remoteUrl
+      return result
     }
   )
 
@@ -361,6 +506,11 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.getLaunchDiff, async () => launchDiff)
   ipcMain.handle(IPC.getLaunchMerge, async () => launchMerge)
+  ipcMain.handle(IPC.getLaunchCompare, async () => {
+    const c = launchCompare
+    launchCompare = null // consume once
+    return c
+  })
   ipcMain.handle(IPC.getGitSetup, async () => {
     const exe = process.execPath
     return `# Diff tool\n${gitDiffToolCommands(exe)}\n\n# Merge tool\n${gitMergeToolCommands(exe)}`
@@ -376,6 +526,12 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(async () => {
+  // Headless CLI: run the comparison and exit; no window, menu or IPC.
+  if (cliMode) {
+    await runCli(cliMode)
+    return
+  }
+
   settings = await loadSettings()
   compareService.cachePath = join(app.getPath('userData'), 'juxta-hashcache.json')
   nativeTheme.themeSource = settings.theme

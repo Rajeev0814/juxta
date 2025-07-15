@@ -9,7 +9,7 @@ export default defineConfig({
   main: {
     // Bundle these into the main/worker output so the packaged app needs no
     // node_modules at runtime (electron + node built-ins stay external).
-    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip', 'yaml', 'fast-xml-parser', 'strnum', 'acorn'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip', 'yaml', 'fast-xml-parser', 'strnum', 'acorn', 'acorn-typescript', 'acorn-jsx', 'basic-ftp'] })],
     build: {
       rollupOptions: {
         input: {
@@ -26,7 +26,7 @@ export default defineConfig({
   preload: {
     // Bundle these into the main/worker output so the packaged app needs no
     // node_modules at runtime (electron + node built-ins stay external).
-    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip', 'yaml', 'fast-xml-parser', 'strnum', 'acorn'] })],
+    plugins: [externalizeDepsPlugin({ exclude: ['picomatch', 'adm-zip', 'yaml', 'fast-xml-parser', 'strnum', 'acorn', 'acorn-typescript', 'acorn-jsx', 'basic-ftp'] })],
     build: {
       rollupOptions: {
         input: {

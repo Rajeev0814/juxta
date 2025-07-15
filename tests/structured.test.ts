@@ -16,11 +16,37 @@ describe('structKind', () => {
   })
 })
 
+describe('structKind', () => {
+  it('detects js/mjs/cjs', () => {
+    expect(structKind('a.js')).toBe('js')
+    expect(structKind('a.mjs')).toBe('js')
+    expect(structKind('a.cjs')).toBe('js')
+  })
+})
+
 describe('parseStructured', () => {
   it('parses each kind and reports errors', () => {
     expect(parseStructured('{"a":1}', 'json')).toEqual({ value: { a: 1 } })
     expect(parseStructured('a: 1', 'yaml')).toEqual({ value: { a: 1 } })
     expect('error' in parseStructured('{bad', 'json')).toBe(true)
+  })
+
+  it('parses JS into a positional-field-free AST and reports parse errors', () => {
+    const r = parseStructured('const x = 1', 'js')
+    expect('value' in r).toBe(true)
+    const json = JSON.stringify(r)
+    expect(json).toContain('"type":"Program"')
+    expect(json).not.toContain('"start"') // positional fields stripped
+    expect('error' in parseStructured('function (', 'js')).toBe(true)
+  })
+
+  it('produces an AST diff that ignores formatting but catches logic changes', () => {
+    const a = parseStructured('const x = 1 // c', 'js')
+    const b = parseStructured('const  x=1;', 'js')
+    const c = parseStructured('const x = 2', 'js')
+    if (!('value' in a) || !('value' in b) || !('value' in c)) throw new Error('parse failed')
+    expect(diffStructured(a.value, b.value).status).toBe('identical')
+    expect(diffStructured(a.value, c.value).status).toBe('changed')
   })
 })
 

@@ -11,6 +11,7 @@ export const IPC = {
   saveSnapshot: 'snapshot:save',
   compare: 'compare:run',
   compare3: 'compare:run3',
+  compareRemote: 'compare:remote',
   compareArchives: 'compare:archives',
   readArchiveEntry: 'compare:readArchiveEntry',
   cancelCompare: 'compare:cancel',
@@ -41,8 +42,17 @@ export const IPC = {
   getLaunchMerge: 'git:launchMerge',
   getGitSetup: 'git:setup',
   openDiff: 'git:openDiff', // main -> renderer (event)
-  openMerge: 'git:openMerge' // main -> renderer (event)
+  openMerge: 'git:openMerge', // main -> renderer (event)
+  getLaunchCompare: 'shell:getLaunchCompare',
+  openCompare: 'shell:openCompare' // main -> renderer (event)
 } as const
+
+/** A compare launched from the OS shell (Explorer context menu). */
+export interface ShellCompare {
+  kind: 'files' | 'folders'
+  left: string
+  right: string
+}
 
 export interface CompareRequest {
   leftRoot: string
@@ -114,6 +124,8 @@ export interface RendererApi {
   compare(req: CompareRequest): Promise<CompareResult>
   /** 3-way folder compare (base / left / right) with per-file classification. */
   compare3(baseRoot: string, leftRoot: string, rightRoot: string, options: CompareOptions): Promise<ThreeWayResult>
+  /** Folder compare where one side is an ftp:// URL (mirrored to a temp folder first). */
+  compareRemote(leftRoot: string, rightRoot: string, options: CompareOptions, password?: string): Promise<CompareResult>
   /** Compare the contents of two archive files (e.g. .zip) as a tree. */
   compareArchives(leftPath: string, rightPath: string): Promise<CompareResult>
   /** Read one entry's content from an archive as text (hex dump when binary). */
@@ -163,4 +175,8 @@ export interface RendererApi {
   /** A `--git-merge` request this process was launched with (mergetool), or null. */
   getLaunchMerge(): Promise<MergeArgs | null>
   onOpenMerge(cb: (args: MergeArgs) => void): () => void
+  /** A shell-launched compare this process started with (Explorer menu), or null. */
+  getLaunchCompare(): Promise<ShellCompare | null>
+  /** A shell compare forwarded from a second launch (Explorer menu). */
+  onOpenCompare(cb: (c: ShellCompare) => void): () => void
 }
