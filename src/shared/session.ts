@@ -1,6 +1,6 @@
 import { DEFAULT_OPTIONS, type CompareOptions } from './types'
 
-export type SessionType = 'folders' | 'files' | 'text'
+export type SessionType = 'folders' | 'files' | 'text' | 'folders3'
 
 /** One open comparison tab. All fields are serializable so sessions persist. */
 export interface Session {
@@ -9,6 +9,8 @@ export interface Session {
   // folder compare
   leftRoot: string
   rightRoot: string
+  /** Common ancestor for a 3-way folder compare. */
+  baseRoot: string
   options: CompareOptions
   // file compare
   leftFile: string
@@ -24,6 +26,7 @@ export function createSession(type: SessionType, id: string): Session {
     type,
     leftRoot: '',
     rightRoot: '',
+    baseRoot: '',
     options: DEFAULT_OPTIONS,
     leftFile: '',
     rightFile: '',
@@ -49,17 +52,24 @@ export function sessionTitle(s: Session): string {
     const r = base(s.rightFile)
     return l || r ? `${l || '—'} ⇄ ${r || '—'}` : 'File Compare'
   }
+  if (s.type === 'folders3') {
+    const l = base(s.leftRoot)
+    const r = base(s.rightRoot)
+    return l || r ? `${l || '—'} ⇆ ${r || '—'} (3-way)` : '3-Way Folders'
+  }
   return 'Text Compare'
 }
 
 export const SESSION_ICON: Record<SessionType, string> = {
   folders: '📁',
   files: '📄',
-  text: '📝'
+  text: '📝',
+  folders3: '🔀'
 }
 
 export const SESSION_LABEL: Record<SessionType, string> = {
   folders: 'Folder Compare',
   files: 'File Compare',
-  text: 'Text Compare'
+  text: 'Text Compare',
+  folders3: '3-Way Folders'
 }

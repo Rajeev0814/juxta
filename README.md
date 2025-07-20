@@ -1,97 +1,115 @@
 # Juxta
 
-**Juxta** (from *juxtapose* — to place side by side for comparison) is a desktop file & folder
-comparison and merge tool built with **Electron + React + TypeScript**. Compare two folder trees
-side-by-side, drill into a synchronized text diff, and merge/sync changes between them.
+**Juxta** (from *juxtapose* — to place side by side) is a desktop file & folder comparison and
+merge tool built with **Electron + React + TypeScript** — a Beyond Compare–style clone. Compare
+folders, files, images, documents, archives, tables and structured data; merge and sync changes;
+and drive it from git, the Explorer context menu, or the command line.
 
-## Features (MVP)
+## Compare modes
 
-- **Folder compare** — pick two roots, get a synchronized two-pane tree. Entries are classified and
-  color-coded as *identical*, *different*, *left-only* or *right-only*, with a *newer* marker.
-- **File compare** — side-by-side diff (Monaco) with intra-line highlighting, synchronized
-  scrolling, prev/next-difference navigation (`F6` / `Shift+F6`), and section-level merge
-  (copy a block ←/→, save back).
-- **Text compare** — two editable panes; paste text into each side and the diff updates live.
-- **Merge actions** — copy a file/folder left→right or right→left, delete orphans, and one-click
-  **"make folders match"** in either direction.
-- **Filters** — include/exclude by glob (`*.log`, `node_modules/`), ignore whitespace, ignore case.
-- **Comparison rules** — by content (SHA-1 hash), by size + timestamp, or quick (size only).
-- **Responsive on large trees** — filesystem walking and hashing run in a **worker thread**; the
-  tree view is virtualized.
-- Light/dark theme, drag-and-drop folder selection, status bar with diff counts.
+Open a tab from the **+** menu (Folder / File / Text / 3-Way Folders):
 
-## Architecture
+- **Folder compare** — synchronized two-pane tree, color-coded *identical / different / left-only /
+  right-only* with a *newer* marker, moved/renamed detection, and a per-directory **churn heatmap**.
+  Merge actions: copy ←/→, delete orphans, one-click **make folders match**, and **sync**
+  (mirror / update / two-way) with a dry-run preview.
+- **File compare** — the comparator is **auto-detected** from the file types:
+  - **images** (png/jpg/gif/webp…) → side-by-side, opacity overlay, swipe, and pixel-diff heatmap
+  - **PDF & Office** (pdf/docx/xlsx/pptx) → extracted-text diff
+  - **archives** (zip/jar/tar/tgz/tar.gz) → content-tree compare; double-click an entry to diff it
+  - **tables** (csv/tsv) → key-column-aligned row/cell compare
+  - **structured** (json/yaml/xml) → key-aligned tree; **js/ts** (+jsx/tsx) → text ⇄ **AST** toggle
+  - anything else → Monaco text diff (or hex for binary; a windowed hex viewer for huge files)
+- **Text compare** — two editable panes; paste and diff live, copy sections across, apply a patch.
+- **3-Way Folders** — base / left / right classification (modified/added/deleted/**conflict**);
+  double-click a file to resolve it in the 3-way merge view.
 
-```
-src/
-  core/        Pure Node comparison engine (no Electron) — unit tested
-    filters.ts   glob include/exclude matching
-    hash.ts      file hashing + whitespace/case normalization
-    walk.ts      recursive directory walker
-    compare.ts   merge + classify two trees -> CompareResult
-    merge.ts     copy / delete / make-match planning + execution
-  main/        Electron main process
-    index.ts         window, IPC handlers
-    compareService.ts owns the worker thread
-    worker/compareWorker.ts  runs the engine off the UI thread
-  preload/     contextBridge -> window.api
-  renderer/    React UI (Toolbar, TwoPaneTree, FileCompare, StatusBar)
-  shared/      types + IPC contract shared across layers
-tests/         Vitest unit tests for the engine (filters, hashing, compare, merge)
-```
+## Filters & rules
 
-The `core` engine is deliberately free of Electron imports so it can be unit-tested directly and
-reused (e.g. for a future CLI).
+Glob include/exclude, ignore whitespace / case / blank lines, ignore-lines-by-regex, and
+format-aware compare for **JSON / YAML / XML / CSV** and **JS/TS (AST)**. Bind
+whitespace/case/blank overrides to file globs with **per-file-type rules**, save named
+**profiles**, and **pin** options to a specific folder pair. Comparison rule: content (SHA-1),
+size+timestamp, or quick (size only).
+
+## Snapshots, reports & patches
+
+- **Snapshots** — capture a folder to a `.juxtasnap` file and later compare a live folder (or
+  another snapshot) against it offline.
+- **Reports** — export a folder comparison as **HTML** or **CSV**.
+- **Patches** — copy / save a unified diff, or **apply** a `.patch` in the text compare.
+
+## Integrations
+
+- **Git difftool / mergetool** — the menu's *Git setup* copies the `git config` commands. Then:
+  `git difftool` opens pairs in Juxta; `git mergetool` opens the 3-way merge (save MERGED, then
+  answer git's "was the merge successful?" prompt).
+- **Explorer context menu** (installed build) — right-click **"Juxta: Select Left"** on one item,
+  then **"Compare with Selected"** on another (files or folders).
+- **FTP/FTPS** — put an `ftp://[user@]host/path` URL on a Folder Compare side; Juxta mirrors it to a
+  temp folder and compares. You're prompted for the password (not saved).
+- **CLI** — headless folder compare:
+  ```
+  Juxta --cli <left> <right> [--out report.html|.csv] [--method content|sizeAndTime|quick] \
+        [--include a,b] [--exclude a,b]
+  ```
+  Exit code: `0` identical · `1` differences · `2` error. On packaged Windows use `--out` and the
+  exit code (a GUI-subsystem exe has no attached console).
+
+## Keyboard shortcuts
+
+| Key | Action |
+| --- | --- |
+| `F5` | Compare / re-compare |
+| `F4` / `Shift+F4` | Next / previous changed file |
+| `F6` / `Shift+F6` | Next / previous difference (in a diff view) |
+| `Esc` | Close the current file diff |
+| `Ctrl+T` | Toggle light / dark theme |
+| `Ctrl+Shift+H` | Toggle "hide identical" |
+| `Ctrl+Shift+S` | Swap left and right |
+| `?` | Keyboard-shortcut help |
 
 ## Getting started
 
 ```bash
 npm install      # install dependencies
-npm run dev      # launch the app with hot reload (electron-vite)
-npm test         # run the engine unit tests (vitest)
+npm run dev      # launch with hot reload (electron-vite)
+npm test         # run the unit tests (vitest)
+npm run typecheck
 npm run build    # production build into out/
 npm start        # preview the production build
 ```
 
-> Requires Node 18+ (developed on Node 24).
+> Requires Node 18+.
 
 ## Building a Windows installer
 
-[electron-builder](https://www.electron.build/) packages the app into a Windows
-installer and a portable executable (output in `release/`):
-
 ```bash
-npm run dist:win   # NSIS installer + portable .exe (x64)
+npm run dist:win   # NSIS installer + portable .exe (x64) in release/
 npm run dist:dir   # unpacked app folder only (release/win-unpacked/Juxta.exe)
 ```
 
-Artifacts:
-
 | File | What it is |
 | --- | --- |
-| `release/Juxta-<version>-x64.exe` | NSIS installer (choose install dir, desktop/start-menu shortcuts) |
-| `release/Juxta-<version>-portable.exe` | Single-file portable build — run without installing |
+| `release/Juxta-<version>-x64.exe` | NSIS installer (shortcuts + Explorer context-menu verbs) |
+| `release/Juxta-<version>-portable.exe` | Single-file portable build |
 | `release/win-unpacked/Juxta.exe` | Unpacked app folder |
 
-Notes:
-- Executable signing is disabled (`win.signAndEditExecutable: false`) so the
-  build runs without a code-signing certificate or elevated privileges. To
-  ship signed binaries, provide a certificate via `CSC_LINK`/`CSC_KEY_PASSWORD`
-  and remove that flag.
-- App icon: `build/icon.ico` brands the installer/shortcuts and `build/icon.png`
-  is the window/taskbar icon (set via `BrowserWindow.icon`, since exe-icon
-  editing is skipped together with signing).
+Signing is disabled (`win.signAndEditExecutable: false`) so it builds without a certificate — the
+unsigned exe triggers a SmartScreen prompt on first run (*More info → Run anyway*). To ship signed
+binaries, provide `CSC_LINK` / `CSC_KEY_PASSWORD` and remove that flag.
 
-## Keyboard shortcuts
+## Architecture
 
-| Key        | Action                       |
-| ---------- | ---------------------------- |
-| `F5`       | Re-run the comparison        |
-| `F6`       | Next difference (file view)  |
-| `Shift+F6` | Previous difference          |
-| `Esc`      | Close file view              |
+Four layers with a strict rule — **`core` and `shared` never import Electron**:
 
-## Roadmap (phase 2)
+- **`src/core/`** — pure Node comparison engine (walk, hash, filters, encoding, hex, canonicalizers,
+  archive/tar/office readers, merge). Unit-tested directly.
+- **`src/shared/`** — pure TS shared by all layers incl. the renderer (IPC contract, types, diff/merge
+  math, sync/snapshot/table/structured/AST helpers).
+- **`src/main/`** — Electron main (window, IPC, single-instance, git/CLI/shell launch); comparison
+  runs in a worker thread with a persistent hash cache.
+- **`src/preload/`** — `contextBridge` exposing `window.api`.
+- **`src/renderer/`** — React UI.
 
-3-way merge, binary/hex viewer, image compare, FTP/SFTP & S3 remotes, session save/restore, CLI
-invocation, git external diff/merge integration, intra-file section merge.
+See `CLAUDE.md` for contributor details and `FEATURES.md` for the feature matrix.

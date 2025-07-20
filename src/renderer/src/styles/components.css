@@ -699,6 +699,25 @@
   width: 130px;
   color: var(--text-dim);
 }
+.tw-col {
+  flex: none;
+  width: 70px;
+  text-align: right;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.tw-row.tw-head {
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-elev);
+}
+.tw-row.tw-head .tw-badge,
+.tw-row.tw-head .tw-col,
+.tw-row.tw-head .tw-path {
+  font-size: 11px;
+}
 .tw-row.st-left-only .tw-badge {
   color: var(--st-left-only);
 }

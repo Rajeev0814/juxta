@@ -60,7 +60,6 @@ export default function App(): React.JSX.Element {
   const [projectScopes, setProjectScopes] = useState<ProjectScope[]>([])
   const [live, setLive] = useState(false)
   const [mergeRequest, setMergeRequest] = useState<MergeArgs | null>(null)
-  const [threeWayOpen, setThreeWayOpen] = useState(false)
   const [results, setResults] = useState<Record<string, CompareResult | null>>({})
   const [showNew, setShowNew] = useState(false)
 
@@ -575,14 +574,6 @@ export default function App(): React.JSX.Element {
     )
   }
 
-  // 3-way folder compare overlay (transient; a file merge opens on top of it).
-  if (threeWayOpen) {
-    return (
-      <div className="app">
-        <Folder3Compare theme={theme} onClose={() => setThreeWayOpen(false)} onOpenMerge={setMergeRequest} />
-      </div>
-    )
-  }
 
   return (
     <div className="app">
@@ -620,14 +611,7 @@ export default function App(): React.JSX.Element {
                   {SESSION_ICON[t]} {SESSION_LABEL[t]}
                 </button>
               ))}
-              <button
-                onClick={() => {
-                  setShowNew(false)
-                  setThreeWayOpen(true)
-                }}
-              >
-                🔀 3-Way Folders
-              </button>
+              <button onClick={() => addSession('folders3')}>{SESSION_ICON.folders3} {SESSION_LABEL.folders3}</button>
             </div>
           )}
         </div>
@@ -866,6 +850,19 @@ export default function App(): React.JSX.Element {
             registerNav={(nav) => {
               navRef.current = nav
             }}
+          />
+        </div>
+      )}
+
+      {active.type === 'folders3' && (
+        <div className="app-body">
+          <Folder3Compare
+            key={active.id}
+            baseRoot={active.baseRoot}
+            leftRoot={active.leftRoot}
+            rightRoot={active.rightRoot}
+            onRoots={(patch) => updateActive(patch)}
+            onOpenMerge={setMergeRequest}
           />
         </div>
       )}
