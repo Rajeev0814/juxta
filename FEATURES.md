@@ -14,7 +14,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 
 ## B. Beyond Compare parity (core)
 - ✅ B1. Folder sync engine (mirror / update / two-way) with dry-run preview
-- ✅ B2. 3-way merge — diff3 auto-merge + mergetool view (conflict nav, save, in-pane resolve) + folder-level 3-way compare (base/left/right classification; open a file to resolve in the merge view)
+- ✅ B2. 3-way merge — diff3 auto-merge + mergetool view (conflict nav, save, in-pane resolve) + folder-level 3-way compare as a persisted tab (base/left/right columns + classification; open a file to resolve in the merge view)
 - ✅ B3. Saved sessions + tabs (multiple comparisons of any type, persisted)
 - ✅ B4. Moved / renamed detection (match by content hash)
 - ✅ B5. Ignore-lines & rules — by-regex + ignore-blank-lines (content hashing) + per-file-type rule sets (glob → whitespace/case/blank overrides)

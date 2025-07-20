@@ -1,12 +1,14 @@
 import React, { useMemo, useState } from 'react'
 import type { MergeArgs } from '../../../shared/git'
 import { DEFAULT_OPTIONS, type ThreeWayNode, type ThreeWayResult, type ThreeWayStatus } from '../../../shared/types'
+import { formatSize } from '../lib/treeUtils'
 import { FolderPicker } from './FolderPicker'
 
 interface Props {
-  theme: 'light' | 'dark'
-  onClose: () => void
-  /** Open a file's 3-way merge in the mergetool view. */
+  baseRoot: string
+  leftRoot: string
+  rightRoot: string
+  onRoots: (patch: Partial<{ baseRoot: string; leftRoot: string; rightRoot: string }>) => void
   onOpenMerge: (args: MergeArgs) => void
 }
 
@@ -36,11 +38,8 @@ function flattenFiles(root: ThreeWayNode): ThreeWayNode[] {
   return out
 }
 
-/** Three-way (base / left / right) folder comparison, shown as a full overlay. */
-export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Element {
-  const [baseRoot, setBaseRoot] = useState('')
-  const [leftRoot, setLeftRoot] = useState('')
-  const [rightRoot, setRightRoot] = useState('')
+/** Three-way (base / left / right) folder comparison, as a persisted tab. */
+export function Folder3Compare({ baseRoot, leftRoot, rightRoot, onRoots, onOpenMerge }: Props): React.JSX.Element {
   const [result, setResult] = useState<ThreeWayResult | null>(null)
   const [comparing, setComparing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -61,6 +60,7 @@ export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Eleme
 
   const files = useMemo(() => (result ? flattenFiles(result.root) : []), [result])
   const rows = hideUnchanged ? files.filter((f) => f.status !== 'unchanged') : files
+  const s = result?.summary
 
   const openMerge = (n: ThreeWayNode): void => {
     if (n.base && n.left && n.right) {
@@ -68,15 +68,15 @@ export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Eleme
     }
   }
 
-  const s = result?.summary
+  const cell = (info?: { size: number }): string => (info ? formatSize(info.size) : '—')
 
   return (
     <div className="file-compare">
       <div className="toolbar">
         <div className="toolbar-row pickers">
-          <FolderPicker label="Base" value={baseRoot} onChange={setBaseRoot} />
-          <FolderPicker label="Left" value={leftRoot} onChange={setLeftRoot} />
-          <FolderPicker label="Right" value={rightRoot} onChange={setRightRoot} />
+          <FolderPicker label="Base" value={baseRoot} onChange={(p) => onRoots({ baseRoot: p })} />
+          <FolderPicker label="Left" value={leftRoot} onChange={(p) => onRoots({ leftRoot: p })} />
+          <FolderPicker label="Right" value={rightRoot} onChange={(p) => onRoots({ rightRoot: p })} />
         </div>
         <div className="toolbar-row controls">
           <button
@@ -96,10 +96,6 @@ export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Eleme
               {s.deleted} deleted · {s.unchanged} unchanged
             </span>
           )}
-          <span className="tb-spacer" />
-          <button onClick={onClose} title="Close 3-way compare">
-            ✕ Close
-          </button>
         </div>
       </div>
 
@@ -117,6 +113,13 @@ export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Eleme
         )}
         {!error && result && (
           <div className="tw-list">
+            <div className="tw-row tw-head">
+              <span className="tw-badge">status</span>
+              <span className="tw-col">base</span>
+              <span className="tw-col">left</span>
+              <span className="tw-col">right</span>
+              <span className="tw-path">path</span>
+            </div>
             {rows.map((n) => {
               const meta = STATUS_META[n.status]
               const mergeable = !!(n.base && n.left && n.right)
@@ -128,8 +131,10 @@ export function Folder3Compare({ onClose, onOpenMerge }: Props): React.JSX.Eleme
                   onDoubleClick={() => openMerge(n)}
                 >
                   <span className={`tw-badge ${meta.cls}`}>{meta.label}</span>
+                  <span className="tw-col">{cell(n.base)}</span>
+                  <span className="tw-col">{cell(n.left)}</span>
+                  <span className="tw-col">{cell(n.right)}</span>
                   <span className="tw-path">{n.relPath}</span>
-                  {n.status === 'conflict' && mergeable && <span className="tw-resolve">resolve →</span>}
                 </div>
               )
             })}

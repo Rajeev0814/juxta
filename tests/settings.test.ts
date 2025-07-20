@@ -41,6 +41,14 @@ describe('coerceSettings', () => {
     expect(new Set(ids).size).toBe(3) // all unique
   })
 
+  it('keeps a folders3 session and its baseRoot', () => {
+    const s = coerceSettings({
+      sessions: [{ id: 'tw', type: 'folders3', baseRoot: '/base', leftRoot: '/l', rightRoot: '/r' }]
+    })
+    expect(s.sessions[0].type).toBe('folders3')
+    expect(s.sessions[0].baseRoot).toBe('/base')
+  })
+
   it('falls back active id to the first session when invalid', () => {
     const s = coerceSettings({ sessions: [{ id: 'only', type: 'files' }], activeSessionId: 'missing' })
     expect(s.activeSessionId).toBe('only')

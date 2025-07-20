@@ -2,7 +2,7 @@
   "name": "juxta",
   "version": "0.1.0",
   "description": "Juxta — a desktop file & folder comparison and merge tool built with Electron, React and TypeScript.",
-  "author": "CFRA",
+  "author": "Rajeev Ranjan",
   "license": "MIT",
   "main": "out/main/index.js",
   "scripts": {
@@ -21,7 +21,7 @@
   "build": {
     "appId": "com.cfra.juxta",
     "productName": "Juxta",
-    "copyright": "Copyright © 2026 CFRA",
+    "copyright": "Copyright © 2025 Rajeev Ranjan",
     "directories": {
       "output": "release",
       "buildResources": "build"
