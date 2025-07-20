@@ -55,7 +55,7 @@ export function defaultSettings(): PersistedSettings {
 export const DEFAULT_SETTINGS = defaultSettings()
 
 const METHODS: CompareMethod[] = ['content', 'sizeAndTime', 'quick']
-const TYPES: SessionType[] = ['folders', 'files', 'text']
+const TYPES: SessionType[] = ['folders', 'files', 'text', 'folders3']
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null
@@ -121,6 +121,7 @@ function coerceSession(raw: unknown): Session | null {
     type: type as SessionType,
     leftRoot: str(raw.leftRoot),
     rightRoot: str(raw.rightRoot),
+    baseRoot: str(raw.baseRoot),
     options: coerceOptions(raw.options),
     leftFile: str(raw.leftFile),
     rightFile: str(raw.rightFile),
