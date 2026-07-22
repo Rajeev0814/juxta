@@ -32,6 +32,8 @@ export interface PersistedSettings {
   activeSessionId: string
   theme: 'light' | 'dark'
   hideIdentical: boolean
+  /** Render tabs/spaces as visible glyphs in the text diff editors. */
+  showWhitespace: boolean
   useTrash: boolean
   windowBounds: WindowBounds | null
   profiles: CompareProfile[]
@@ -47,6 +49,7 @@ export function defaultSettings(): PersistedSettings {
     activeSessionId: first.id,
     theme: 'dark',
     hideIdentical: false,
+    showWhitespace: false,
     useTrash: true,
     windowBounds: null,
     profiles: [],
@@ -196,6 +199,7 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   }
   if (raw.theme === 'light' || raw.theme === 'dark') s.theme = raw.theme
   if (typeof raw.hideIdentical === 'boolean') s.hideIdentical = raw.hideIdentical
+  if (typeof raw.showWhitespace === 'boolean') s.showWhitespace = raw.showWhitespace
   if (typeof raw.useTrash === 'boolean') s.useTrash = raw.useTrash
   s.windowBounds = coerceBounds(raw.windowBounds)
   s.profiles = coerceProfiles(raw.profiles)

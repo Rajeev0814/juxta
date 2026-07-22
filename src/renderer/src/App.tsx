@@ -53,6 +53,7 @@ function basename(p: string): string {
 export default function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>('dark')
   const [hideIdentical, setHideIdentical] = useState(false)
+  const [showWhitespace, setShowWhitespace] = useState(false)
   const [useTrash, setUseTrash] = useState(true)
 
   const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
@@ -117,6 +118,7 @@ export default function App(): React.JSX.Element {
       setActiveId(s.activeSessionId)
       setTheme(s.theme)
       setHideIdentical(s.hideIdentical)
+      setShowWhitespace(s.showWhitespace)
       setUseTrash(s.useTrash)
       setProfiles(s.profiles)
       setProjectScopes(s.projectScopes)
@@ -136,6 +138,7 @@ export default function App(): React.JSX.Element {
         activeSessionId: activeId,
         theme,
         hideIdentical,
+        showWhitespace,
         useTrash,
         windowBounds: null,
         profiles,
@@ -144,7 +147,7 @@ export default function App(): React.JSX.Element {
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles, projectScopes, converters])
+  }, [sessions, activeId, theme, hideIdentical, showWhitespace, useTrash, profiles, projectScopes, converters])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -749,6 +752,8 @@ export default function App(): React.JSX.Element {
                 node={activeNode}
                 theme={theme}
                 ignoreWhitespace={active.options.filters.ignoreWhitespace}
+                showWhitespace={showWhitespace}
+                onToggleWhitespace={() => setShowWhitespace((v) => !v)}
                 onClose={() => setView('folder')}
                 onSaved={() => void refresh()}
                 registerNav={(nav) => {
@@ -827,6 +832,8 @@ export default function App(): React.JSX.Element {
                 node={directNode}
                 theme={theme}
                 ignoreWhitespace={false}
+                showWhitespace={showWhitespace}
+                onToggleWhitespace={() => setShowWhitespace((v) => !v)}
                 onClose={() => updateActive({ leftFile: '', rightFile: '' })}
                 registerNav={(nav) => {
                   navRef.current = nav
@@ -863,6 +870,8 @@ export default function App(): React.JSX.Element {
             key={active.id}
             theme={theme}
             ignoreWhitespace={false}
+            showWhitespace={showWhitespace}
+            onToggleWhitespace={() => setShowWhitespace((v) => !v)}
             initialLeft={active.leftText}
             initialRight={active.rightText}
             onChange={(l, r) => updateSession(active.id, { leftText: l, rightText: r })}

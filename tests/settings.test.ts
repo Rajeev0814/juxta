@@ -115,6 +115,12 @@ describe('coerceSettings', () => {
     expect(s.converters[0]).toMatchObject({ name: 'RTF', extensions: ['rtf'], command: 'unrtf' })
   })
 
+  it('reads showWhitespace and defaults it to false', () => {
+    expect(coerceSettings({}).showWhitespace).toBe(false)
+    expect(coerceSettings({ showWhitespace: true }).showWhitespace).toBe(true)
+    expect(coerceSettings({ showWhitespace: 'yes' }).showWhitespace).toBe(false)
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,
