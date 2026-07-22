@@ -28,7 +28,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ✅ C2. Hex / binary viewer (hex dump shown + diffed for binary files)
 - ✅ C3. Table compare — CSV/TSV-aware (ignore row order) + key-column-aligned table view (row/cell diff, auto-detected)
 - ✅ C4. Structured data — JSON-, YAML- & XML-aware compare + key-aligned structured tree view (added/removed/changed per node, raw-text toggle)
-- 🟦 C5. AST / semantic code diff — ✅ JS/TS family (js/mjs/cjs/jsx/ts/mts/cts/tsx) AST-aware compare + aligned AST tree view (text ⇄ AST toggle), via acorn + acorn-typescript/acorn-jsx; ⬜ non-JS languages (Python/… need native parsers)
+- 🟦 C5. AST / semantic code diff — ✅ JS/TS family (js/mjs/cjs/jsx/ts/mts/cts/tsx) AST-aware compare + aligned AST tree view (text ⇄ AST toggle), via acorn + acorn-typescript/acorn-jsx; ✅ Lua (.lua) via luaparse (pure-JS, same tree view + hash normalizer); ⬜ Python & others (need a native/WASM parser)
 - ✅ C6. Document text compare — PDF (pdf-parse) + Office docx/xlsx/pptx text-diff (adm-zip + XML, auto-detected)
 - ✅ C7. Archive browsing — zip-family + tar/tgz/tar.gz; archive ↔ folder compare; drill into an entry to diff its content (text/hex)
 

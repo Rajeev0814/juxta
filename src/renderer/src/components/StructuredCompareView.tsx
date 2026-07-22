@@ -13,8 +13,11 @@ interface Props {
 
 function monacoLang(kind: string, path: string): string {
   if (kind === 'js') return codeLanguage(path) // javascript | typescript
-  return kind // json | yaml | xml
+  return kind // json | yaml | xml | lua
 }
+
+// Code kinds default to raw text (the AST tree is verbose) and label the tree "AST".
+const CODE_KINDS = new Set(['js', 'lua'])
 
 function scalar(v: unknown): string {
   if (v === undefined) return ''
@@ -63,12 +66,13 @@ function allContainerPaths(node: StructNode): string[] {
 export function StructuredCompareView({ left, right, theme, hideIdentical }: Props): React.JSX.Element {
   const kind = structKind(left) ?? 'json'
   const kindLabel = kind === 'js' ? (codeLanguage(left) === 'typescript' ? 'TS' : 'JS') : kind.toUpperCase()
+  const isCode = CODE_KINDS.has(kind)
   const [leftText, setLeftText] = useState<string | null>(null)
   const [rightText, setRightText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   // JS/AST trees are verbose, so code defaults to raw text (tree is a toggle);
   // data formats default to the structured tree.
-  const [mode, setMode] = useState<'tree' | 'raw'>(kind === 'js' ? 'raw' : 'tree')
+  const [mode, setMode] = useState<'tree' | 'raw'>(isCode ? 'raw' : 'tree')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   useEffect(() => {
@@ -139,7 +143,7 @@ export function StructuredCompareView({ left, right, theme, hideIdentical }: Pro
             onClick={() => setMode('tree')}
             title={parseError ? 'Parsing failed — raw text only' : 'Key-aligned structured tree'}
           >
-            ⊟ {kind === 'js' ? 'AST' : 'Structured'}
+            ⊟ {isCode ? 'AST' : 'Structured'}
           </button>
           <button
             className={effectiveMode === 'raw' ? 'primary' : ''}
