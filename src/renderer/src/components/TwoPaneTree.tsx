@@ -34,6 +34,7 @@ interface Props {
 export function TwoPaneTree(props: Props): React.JSX.Element {
   const { result } = props
   const [expanded, setExpanded] = useState<Set<string>>(() => defaultExpanded(result.root))
+  const [nameFilter, setNameFilter] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportH, setViewportH] = useState(600)
   const scrollerRef = useRef<HTMLDivElement>(null)
@@ -53,8 +54,8 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
   }, [])
 
   const rows = useMemo(
-    () => flatten(result.root, expanded, props.hideIdentical),
-    [result, expanded, props.hideIdentical]
+    () => flatten(result.root, expanded, props.hideIdentical, nameFilter),
+    [result, expanded, props.hideIdentical, nameFilter]
   )
 
   // Per-directory change density (folder churn heatmap).
@@ -67,7 +68,7 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
     const next = new Set(expanded)
     for (const a of ancestorsOf(reveal.relPath)) next.add(a)
     setExpanded(next)
-    const freshRows = flatten(result.root, next, props.hideIdentical)
+    const freshRows = flatten(result.root, next, props.hideIdentical, nameFilter)
     const idx = freshRows.findIndex((r) => r.node.relPath === reveal.relPath)
     const scroller = scrollerRef.current
     if (idx >= 0 && scroller) {
@@ -103,6 +104,21 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
 
   return (
     <div className="tree">
+      <div className="tree-filter-bar">
+        <input
+          className="tree-filter"
+          type="text"
+          value={nameFilter}
+          onChange={(e) => setNameFilter(e.target.value)}
+          placeholder="Filter by file name…"
+          spellCheck={false}
+        />
+        {nameFilter.trim() && (
+          <button className="tree-filter-clear" onClick={() => setNameFilter('')} title="Clear filter">
+            ✕
+          </button>
+        )}
+      </div>
       <div className="tree-header">
         <div className="pane-title left" title={result.leftRoot}>
           {result.leftRoot}
