@@ -22,6 +22,7 @@ export const IPC = {
   readImage: 'fs:readImage',
   readPdfText: 'fs:readPdfText',
   readOfficeText: 'fs:readOfficeText',
+  runFormatConverter: 'plugin:runConverter',
   writeFile: 'fs:writeFile',
   saveText: 'fs:saveText',
   writeClipboard: 'clipboard:write',
@@ -143,6 +144,8 @@ export interface RendererApi {
   readPdfText(path: string): Promise<string>
   /** Extract the plain text of a .docx/.xlsx file for text-level comparison. */
   readOfficeText(path: string): Promise<string>
+  /** Run the user-configured format converter matching this file, returning its stdout text. */
+  runFormatConverter(path: string): Promise<string>
   writeFile(path: string, text: string): Promise<void>
   writeClipboard(text: string): Promise<void>
   /** Prompt for a save location and write text; returns the path or null if cancelled. */

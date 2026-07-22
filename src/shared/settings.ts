@@ -6,6 +6,7 @@ import {
   type FilterOptions
 } from './types'
 import { createSession, type Session, type SessionType } from './session'
+import { coerceConverters, type FormatConverter } from './converters'
 
 export interface WindowBounds {
   x: number
@@ -35,6 +36,8 @@ export interface PersistedSettings {
   windowBounds: WindowBounds | null
   profiles: CompareProfile[]
   projectScopes: ProjectScope[]
+  /** User-defined external format converters (extension → command producing text). */
+  converters: FormatConverter[]
 }
 
 export function defaultSettings(): PersistedSettings {
@@ -47,7 +50,8 @@ export function defaultSettings(): PersistedSettings {
     useTrash: true,
     windowBounds: null,
     profiles: [],
-    projectScopes: []
+    projectScopes: [],
+    converters: []
   }
 }
 
@@ -196,5 +200,6 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   s.windowBounds = coerceBounds(raw.windowBounds)
   s.profiles = coerceProfiles(raw.profiles)
   s.projectScopes = coerceProjectScopes(raw.projectScopes)
+  s.converters = coerceConverters(raw.converters)
   return s
 }

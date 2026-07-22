@@ -38,6 +38,7 @@ const api: RendererApi = {
   readImage: (path: string): Promise<string | null> => ipcRenderer.invoke(IPC.readImage, path),
   readPdfText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readPdfText, path),
   readOfficeText: (path: string): Promise<string> => ipcRenderer.invoke(IPC.readOfficeText, path),
+  runFormatConverter: (path: string): Promise<string> => ipcRenderer.invoke(IPC.runFormatConverter, path),
   writeFile: (path: string, text: string) => ipcRenderer.invoke(IPC.writeFile, path, text),
   writeClipboard: (text: string) => ipcRenderer.invoke(IPC.writeClipboard, text),
   saveText: (defaultName: string, content: string) => ipcRenderer.invoke(IPC.saveText, defaultName, content),

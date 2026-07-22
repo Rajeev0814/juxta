@@ -30,6 +30,8 @@ import { gitDiffToolCommands, gitMergeToolCommands, parseGitDiffArgs, parseGitMe
 import { parseCompareWith, parseSelectLeft } from '../shared/shell'
 import type { ShellCompare } from '../shared/ipc'
 import { parseCliArgs, formatCliReport, type CliOptions } from '../shared/cli'
+import { findConverter, buildConverterInvocation } from '../shared/converters'
+import { execFile } from 'node:child_process'
 import { compareFolders } from '../core/compare'
 import { toCsvReport, toHtmlReport } from '../shared/report'
 import { isFtpUrl, parseFtpUrl } from '../shared/ftp'
@@ -82,6 +84,25 @@ async function runCli(cli: CliOptions): Promise<void> {
     process.stderr.write(`juxta: ${err instanceof Error ? err.message : String(err)}\n`)
     app.exit(2)
   }
+}
+
+/**
+ * Run a user-configured format-converter command and return its stdout as text.
+ * Spawned via execFile (no shell) so arguments can't be re-interpreted; the
+ * command itself is user-provided, same trust model as a git difftool.
+ */
+function runConverterCommand(command: string, args: string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      command,
+      args,
+      { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, windowsHide: true },
+      (err, stdout) => {
+        if (err) reject(err)
+        else resolve(stdout)
+      }
+    )
+  })
 }
 
 /** Where the Explorer "Select Left" verb stashes the pending left-hand path. */
@@ -445,6 +466,13 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.readOfficeText, async (_e, path: string): Promise<string> => {
     return extractOfficeText(path)
+  })
+
+  ipcMain.handle(IPC.runFormatConverter, async (_e, path: string): Promise<string> => {
+    const conv = findConverter(settings.converters, path)
+    if (!conv) throw new Error('No format converter is configured for this file type')
+    const { command, args } = buildConverterInvocation(conv, path)
+    return runConverterCommand(command, args)
   })
 
   ipcMain.handle(IPC.writeFile, async (_e, path: string, text: string) => {

@@ -37,7 +37,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 - ✅ D2. Git — difftool + mergetool (`--git-diff` / `--git-merge`, single-instance forwarding, setup helper; mergetool uses trustExitCode=false so git prompts after the async GUI resolve)
 - 🟦 D3. CLI — ✅ headless folder compare (`--cli L R [--out .html/.csv] [--method] [--include/--exclude]`), ✅ richer console output (human summary + `--verbose` per-file listing + `--quiet` machine line), HTML/CSV report, exit code 0/1/2; ⬜ attaching to the parent console on packaged Windows (GUI-subsystem exe still can't print to a terminal — use `--out` + exit code there)
 - ✅ D4. OS shell integration — Explorer right-click "Juxta: Select Left" + "Compare with Selected" for files & folders (installer registers HKCU verbs; two-step launch opens the right compare)
-- ⬜ D5. Plugin system
+- 🟦 D5. Plugin system — ✅ external format converters (map file extensions → a user-configured command that emits plain text on stdout; spawned via execFile, no shell; matching pairs open in a read-only extracted-text diff; configured in `juxta-settings.json`); ⬜ in-app converter editor UI + richer plugin kinds (custom comparators/JS plugins)
 
 ## E. Performance & robustness
 - ✅ E1. Persistent hash cache (path+size+mtime+flags keyed)
