@@ -35,7 +35,7 @@ Status: ⬜ todo · 🟦 in progress · ✅ done
 ## D. Remote & integration
 - 🟦 D1. Remote folders — ✅ FTP/FTPS: put an `ftp://` URL on a Folder Compare side; it mirrors to a temp folder then runs the normal compare (basic-ftp, injectable/tested); ⬜ SFTP, S3, live two-way sync (need engine VFS)
 - ✅ D2. Git — difftool + mergetool (`--git-diff` / `--git-merge`, single-instance forwarding, setup helper; mergetool uses trustExitCode=false so git prompts after the async GUI resolve)
-- 🟦 D3. CLI — ✅ headless folder compare (`--cli L R [--out .html/.csv] [--method] [--include/--exclude]`), summary to stdout, HTML/CSV report, exit code 0/1/2; ⬜ richer console output on packaged Windows (GUI-subsystem has no attached console)
+- 🟦 D3. CLI — ✅ headless folder compare (`--cli L R [--out .html/.csv] [--method] [--include/--exclude]`), ✅ richer console output (human summary + `--verbose` per-file listing + `--quiet` machine line), HTML/CSV report, exit code 0/1/2; ⬜ attaching to the parent console on packaged Windows (GUI-subsystem exe still can't print to a terminal — use `--out` + exit code there)
 - ✅ D4. OS shell integration — Explorer right-click "Juxta: Select Left" + "Compare with Selected" for files & folders (installer registers HKCU verbs; two-step launch opens the right compare)
 - ⬜ D5. Plugin system
 

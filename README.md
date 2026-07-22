@@ -58,10 +58,13 @@ size+timestamp, or quick (size only).
 - **CLI** — headless folder compare:
   ```
   Juxta --cli <left> <right> [--out report.html|.csv] [--method content|sizeAndTime|quick] \
-        [--include a,b] [--exclude a,b]
+        [--include a,b] [--exclude a,b] [--verbose|-v] [--quiet|-q]
   ```
-  Exit code: `0` identical · `1` differences · `2` error. On packaged Windows use `--out` and the
-  exit code (a GUI-subsystem exe has no attached console).
+  Output: a human-readable summary by default; `--verbose` also lists every changed file
+  (`~` different · `<` left-only · `>` right-only); `--quiet` prints just the compact
+  machine-readable line (`different=… leftOnly=… …`) for scripts. Exit code: `0` identical ·
+  `1` differences · `2` error. On packaged Windows use `--out` and the exit code (a
+  GUI-subsystem exe has no attached console).
 
 ## Keyboard shortcuts
 

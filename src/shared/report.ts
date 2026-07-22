@@ -25,7 +25,7 @@ function fmtSize(n: number | undefined): string {
 }
 
 /** Collect every changed (non-identical) file node, depth-first. */
-function collectChangedFiles(result: CompareResult): CompareNode[] {
+export function collectChangedFiles(result: CompareResult): CompareNode[] {
   const changed: CompareNode[] = []
   const visit = (node: CompareNode): void => {
     for (const child of node.children ?? []) {
