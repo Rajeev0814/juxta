@@ -6,7 +6,7 @@ import {
   type FileTypeRule,
   type FilterOptions
 } from './types'
-import { createSession, type Session, type SessionType } from './session'
+import { createSession, type RecentComparison, type Session, type SessionType } from './session'
 import { coerceConverters, type FormatConverter } from './converters'
 
 export interface WindowBounds {
@@ -43,6 +43,8 @@ export interface PersistedSettings {
   projectScopes: ProjectScope[]
   /** User-defined external format converters (extension → command producing text). */
   converters: FormatConverter[]
+  /** Most-recently-run folder/file comparisons, newest first (for "Open recent"). */
+  recents: RecentComparison[]
 }
 
 export function defaultSettings(): PersistedSettings {
@@ -58,7 +60,8 @@ export function defaultSettings(): PersistedSettings {
     windowBounds: null,
     profiles: [],
     projectScopes: [],
-    converters: []
+    converters: [],
+    recents: []
   }
 }
 
@@ -162,6 +165,24 @@ function coerceHiddenCategories(raw: unknown): DiffStatus[] {
   )
 }
 
+function coerceRecents(raw: unknown): RecentComparison[] {
+  if (!Array.isArray(raw)) return []
+  const out: RecentComparison[] = []
+  for (const r of raw) {
+    if (
+      isObject(r) &&
+      (r.type === 'folders' || r.type === 'files') &&
+      typeof r.left === 'string' &&
+      typeof r.right === 'string' &&
+      r.left &&
+      r.right
+    ) {
+      out.push({ type: r.type, left: r.left, right: r.right })
+    }
+  }
+  return out.slice(0, 10)
+}
+
 function coerceProjectScopes(raw: unknown): ProjectScope[] {
   if (!Array.isArray(raw)) return []
   const out: ProjectScope[] = []
@@ -220,5 +241,6 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   s.profiles = coerceProfiles(raw.profiles)
   s.projectScopes = coerceProjectScopes(raw.projectScopes)
   s.converters = coerceConverters(raw.converters)
+  s.recents = coerceRecents(raw.recents)
   return s
 }

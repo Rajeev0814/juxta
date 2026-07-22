@@ -129,6 +129,21 @@ describe('coerceSettings', () => {
     expect(coerceSettings({ hiddenCategories: 'different' }).hiddenCategories).toEqual([])
   })
 
+  it('keeps only valid folders/files recents and caps at 10', () => {
+    expect(coerceSettings({}).recents).toEqual([])
+    const many = Array.from({ length: 14 }, (_, i) => ({ type: 'folders', left: `L${i}`, right: `R${i}` }))
+    const s = coerceSettings({
+      recents: [
+        { type: 'text', left: 'a', right: 'b' }, // wrong type → dropped
+        { type: 'files', left: 'x', right: '' }, // missing side → dropped
+        ...many
+      ]
+    })
+    expect(s.recents.every((r) => r.type === 'folders' || r.type === 'files')).toBe(true)
+    expect(s.recents.length).toBeLessThanOrEqual(10)
+    expect(s.recents[0]).toMatchObject({ type: 'folders', left: 'L0' })
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,
