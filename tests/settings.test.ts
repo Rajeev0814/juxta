@@ -103,6 +103,18 @@ describe('coerceSettings', () => {
     expect(coerceSettings({}).projectScopes).toEqual([])
   })
 
+  it('keeps valid format converters and defaults them to an empty array', () => {
+    expect(coerceSettings({}).converters).toEqual([])
+    const s = coerceSettings({
+      converters: [
+        { name: 'RTF', extensions: ['.rtf'], command: 'unrtf', args: ['--text', '${file}'] },
+        { name: 'bad' } // dropped: no command/extensions
+      ]
+    })
+    expect(s.converters).toHaveLength(1)
+    expect(s.converters[0]).toMatchObject({ name: 'RTF', extensions: ['rtf'], command: 'unrtf' })
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,

@@ -4,6 +4,7 @@ import { listChangedFiles } from '../../shared/nav'
 import { planSync, planTimestamp, type SyncMode } from '../../shared/sync'
 import { toHtmlReport, toCsvReport } from '../../shared/report'
 import type { CompareProfile, ProjectScope } from '../../shared/settings'
+import { findConverter, type FormatConverter } from '../../shared/converters'
 import {
   createSession,
   sessionTitle,
@@ -58,6 +59,7 @@ export default function App(): React.JSX.Element {
   const [activeId, setActiveId] = useState('session-0')
   const [profiles, setProfiles] = useState<CompareProfile[]>([])
   const [projectScopes, setProjectScopes] = useState<ProjectScope[]>([])
+  const [converters, setConverters] = useState<FormatConverter[]>([])
   const [live, setLive] = useState(false)
   const [mergeRequest, setMergeRequest] = useState<MergeArgs | null>(null)
   const [results, setResults] = useState<Record<string, CompareResult | null>>({})
@@ -118,6 +120,7 @@ export default function App(): React.JSX.Element {
       setUseTrash(s.useTrash)
       setProfiles(s.profiles)
       setProjectScopes(s.projectScopes)
+      setConverters(s.converters)
       hydratedRef.current = true
     })
     return () => {
@@ -136,11 +139,12 @@ export default function App(): React.JSX.Element {
         useTrash,
         windowBounds: null,
         profiles,
-        projectScopes
+        projectScopes,
+        converters
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles, projectScopes])
+  }, [sessions, activeId, theme, hideIdentical, useTrash, profiles, projectScopes, converters])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -801,6 +805,21 @@ export default function App(): React.JSX.Element {
                 right={active.rightFile}
                 theme={theme}
                 hideIdentical={hideIdentical}
+              />
+            ) : active.leftFile &&
+              active.rightFile &&
+              findConverter(converters, active.leftFile) &&
+              findConverter(converters, active.rightFile) ? (
+              <ExtractedTextCompareView
+                key={`${active.id}:${active.leftFile}|${active.rightFile}`}
+                left={active.leftFile}
+                right={active.rightFile}
+                theme={theme}
+                title={`${findConverter(converters, active.leftFile)!.name} (converted)`}
+                extract={(p) => window.api.runFormatConverter(p)}
+                registerNav={(nav) => {
+                  navRef.current = nav
+                }}
               />
             ) : directNode ? (
               <FileCompare
