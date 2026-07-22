@@ -15,6 +15,9 @@ import { juxtaTheme } from '../lib/monacoSetup'
 interface Props {
   theme: 'light' | 'dark'
   ignoreWhitespace: boolean
+  /** Render tabs/spaces as visible glyphs (persisted global). */
+  showWhitespace: boolean
+  onToggleWhitespace: () => void
   /** Initial pane contents (used once on mount; the component is uncontrolled after). */
   initialLeft: string
   initialRight: string
@@ -39,6 +42,8 @@ function setEditorText(ed: MonacoEditorNS.ICodeEditor, text: string): void {
 export function TextCompare({
   theme,
   ignoreWhitespace,
+  showWhitespace,
+  onToggleWhitespace,
   initialLeft,
   initialRight,
   onChange,
@@ -214,6 +219,13 @@ export function TextCompare({
           <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
             {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}
           </button>
+          <button
+            className={showWhitespace ? 'primary' : ''}
+            onClick={onToggleWhitespace}
+            title="Show tabs & spaces as visible glyphs"
+          >
+            ¶ Whitespace
+          </button>
           <button onClick={copyPatch} disabled={count === 0} title="Copy a unified diff (patch) to the clipboard">
             {copied ? '✓ Copied' : '⎘ Patch'}
           </button>
@@ -244,6 +256,7 @@ export function TextCompare({
             originalEditable: true,
             renderSideBySide: !inline,
             ignoreTrimWhitespace: ignoreWhitespace,
+            renderWhitespace: showWhitespace ? 'all' : 'none',
             renderOverviewRuler: true,
             automaticLayout: true,
             minimap: { enabled: true, renderCharacters: false },

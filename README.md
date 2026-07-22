@@ -28,6 +28,7 @@ Open a tab from the **+** menu (Folder / File / Text / 3-Way Folders):
   - **structured** (json/yaml/xml) → key-aligned tree; **js/ts** (+jsx/tsx) & **lua** → text ⇄ **AST** toggle
   - anything else → Monaco text diff (or hex for binary; a windowed hex viewer for huge files)
 - **Text compare** — two editable panes; paste and diff live, copy sections across, apply a patch.
+  A **¶ Whitespace** toggle (in the file/text diff toolbars) renders tabs & spaces as visible glyphs.
 - **3-Way Folders** — base / left / right classification (modified/added/deleted/**conflict**);
   double-click a file to resolve it in the 3-way merge view.
 

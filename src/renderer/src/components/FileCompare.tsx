@@ -11,6 +11,9 @@ interface Props {
   node: CompareNode
   theme: 'light' | 'dark'
   ignoreWhitespace: boolean
+  /** Render tabs/spaces as visible glyphs (persisted global). */
+  showWhitespace: boolean
+  onToggleWhitespace: () => void
   onClose: () => void
   /** Register prev/next-diff handlers so global shortcuts (F6) can drive them. */
   registerNav: (nav: { next: () => void; prev: () => void } | null) => void
@@ -21,7 +24,7 @@ interface Props {
 /** Block merge is disabled above this combined line count (LCS cost guard). */
 const MAX_MERGE_LINES = 40000
 
-export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNav, onSaved }: Props): React.JSX.Element {
+export function FileCompare({ node, theme, ignoreWhitespace, showWhitespace, onToggleWhitespace, onClose, registerNav, onSaved }: Props): React.JSX.Element {
   const [leftText, setLeftText] = useState<string | null>(null)
   const [rightText, setRightText] = useState<string | null>(null)
   const [binary, setBinary] = useState(false)
@@ -248,6 +251,13 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
           <button onClick={() => setInline((v) => !v)} title="Inline wraps long lines; side-by-side scrolls them">
             {inline ? '⊟ Side-by-side' : '☰ Inline (wrap)'}
           </button>
+          <button
+            className={showWhitespace ? 'primary' : ''}
+            onClick={onToggleWhitespace}
+            title="Show tabs & spaces as visible glyphs"
+          >
+            ¶ Whitespace
+          </button>
           <button onClick={copyPatch} disabled={!loaded || binary || tooLarge} title="Copy a unified diff (patch) to the clipboard">
             {copied ? '✓ Copied' : '⎘ Patch'}
           </button>
@@ -279,6 +289,7 @@ export function FileCompare({ node, theme, ignoreWhitespace, onClose, registerNa
               originalEditable: false,
               renderSideBySide: !inline,
               ignoreTrimWhitespace: ignoreWhitespace,
+              renderWhitespace: showWhitespace ? 'all' : 'none',
               renderOverviewRuler: true,
               automaticLayout: true,
               minimap: { enabled: true, renderCharacters: false },
