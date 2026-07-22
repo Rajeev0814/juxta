@@ -5,15 +5,17 @@
 import { parse as parseYaml } from 'yaml'
 import { XMLParser } from 'fast-xml-parser'
 import { astToPlain, isCodePath } from './jsast'
+import { isLuaPath, luaAstToPlain } from './luaast'
 
-// 'js' covers all JS/TS-family code (js/mjs/cjs/jsx/ts/mts/cts/tsx).
-export type StructKind = 'json' | 'yaml' | 'xml' | 'js'
+// 'js' covers all JS/TS-family code (js/mjs/cjs/jsx/ts/mts/cts/tsx); 'lua' is Lua.
+export type StructKind = 'json' | 'yaml' | 'xml' | 'js' | 'lua'
 
 export function structKind(path: string): StructKind | null {
   if (/\.json$/i.test(path)) return 'json'
   if (/\.ya?ml$/i.test(path)) return 'yaml'
   if (/\.xml$/i.test(path)) return 'xml'
   if (isCodePath(path)) return 'js'
+  if (isLuaPath(path)) return 'lua'
   return null
 }
 
@@ -37,6 +39,7 @@ export function parseStructured(
     if (kind === 'json') return { value: JSON.parse(text) }
     if (kind === 'yaml') return { value: parseYaml(text) }
     if (kind === 'js') return { value: astToPlain(text, path) }
+    if (kind === 'lua') return { value: luaAstToPlain(text) }
     return { value: xmlParser.parse(text) }
   } catch (e) {
     return { error: e instanceof Error ? e.message : String(e) }
