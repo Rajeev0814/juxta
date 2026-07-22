@@ -1,5 +1,5 @@
 import React from 'react'
-import type { CompareResult, ProgressUpdate } from '../../../shared/types'
+import type { CompareResult, DiffStatus, ProgressUpdate } from '../../../shared/types'
 
 interface Props {
   result: CompareResult | null
@@ -7,6 +7,9 @@ interface Props {
   comparing: boolean
   hideIdentical: boolean
   onToggleHideIdentical: (v: boolean) => void
+  /** Categories currently hidden from the folder tree (different/leftOnly/rightOnly). */
+  hiddenStatuses: ReadonlySet<DiffStatus>
+  onToggleStatus: (s: DiffStatus) => void
   useTrash: boolean
   onToggleTrash: (v: boolean) => void
 }
@@ -17,6 +20,8 @@ export function StatusBar({
   comparing,
   hideIdentical,
   onToggleHideIdentical,
+  hiddenStatuses,
+  onToggleStatus,
   useTrash,
   onToggleTrash
 }: Props): React.JSX.Element {
@@ -47,9 +52,27 @@ export function StatusBar({
 
       {result && !comparing && (
         <div className="sb-counts">
-          <span className="c c-different">⬤ {result.summary.different} different</span>
-          <span className="c c-left">⬤ {result.summary.leftOnly} left only</span>
-          <span className="c c-right">⬤ {result.summary.rightOnly} right only</span>
+          <button
+            className={`c c-different chip${hiddenStatuses.has('different') ? ' off' : ''}`}
+            onClick={() => onToggleStatus('different')}
+            title={hiddenStatuses.has('different') ? 'Show different files' : 'Hide different files'}
+          >
+            ⬤ {result.summary.different} different
+          </button>
+          <button
+            className={`c c-left chip${hiddenStatuses.has('leftOnly') ? ' off' : ''}`}
+            onClick={() => onToggleStatus('leftOnly')}
+            title={hiddenStatuses.has('leftOnly') ? 'Show left-only files' : 'Hide left-only files'}
+          >
+            ⬤ {result.summary.leftOnly} left only
+          </button>
+          <button
+            className={`c c-right chip${hiddenStatuses.has('rightOnly') ? ' off' : ''}`}
+            onClick={() => onToggleStatus('rightOnly')}
+            title={hiddenStatuses.has('rightOnly') ? 'Show right-only files' : 'Hide right-only files'}
+          >
+            ⬤ {result.summary.rightOnly} right only
+          </button>
           {result.summary.moved > 0 && (
             <span className="c c-moved" title="Renamed/moved files (same content, different path)">
               ⇄ {result.summary.moved} moved

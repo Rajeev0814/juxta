@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { CompareNode } from '../src/shared/types'
-import { flatten, visibleForNameFilter } from '../src/renderer/src/lib/treeUtils'
+import { flatten, visibleForNameFilter, visibleNodes } from '../src/renderer/src/lib/treeUtils'
 
 /** A small tree: /src/app.ts, /src/util.ts, /README.md */
 function tree(): CompareNode {
@@ -68,5 +68,33 @@ describe('flatten with a name filter', () => {
     t.children![0].children![0].status = 'identical' // src/app.ts identical
     const paths = flatten(t, new Set(), true, 'ts').map((r) => r.node.relPath)
     expect(paths).toEqual(['src', 'src/util.ts'])
+  })
+})
+
+describe('category filtering (hiddenStatuses)', () => {
+  it('hides files whose status is in the set, dropping now-empty dirs', () => {
+    const t = tree()
+    // src/app.ts -> leftOnly, src/util.ts stays different, README.md different
+    t.children![0].children![0].status = 'leftOnly'
+    const hidden = new Set<'leftOnly'>(['leftOnly'])
+    const paths = flatten(t, new Set(['src']), false, '', hidden).map((r) => r.node.relPath)
+    expect(paths).toEqual(['src', 'src/util.ts', 'README.md'])
+  })
+
+  it('drops a directory entirely when all its files are hidden', () => {
+    const t = tree()
+    t.children![0].children![0].status = 'leftOnly'
+    t.children![0].children![1].status = 'leftOnly'
+    const hidden = new Set<'leftOnly'>(['leftOnly'])
+    const paths = flatten(t, new Set(['src']), false, '', hidden).map((r) => r.node.relPath)
+    expect(paths).toEqual(['README.md']) // whole src/ subtree gone
+  })
+
+  it('combines with hideIdentical and the name filter', () => {
+    const t = tree()
+    t.children![0].children![0].status = 'rightOnly' // src/app.ts
+    // Hide rightOnly + filter name "app" -> src/app.ts excluded, nothing left in src
+    const v = visibleNodes(t, { hideIdentical: false, hiddenStatuses: new Set(['rightOnly']), nameFilter: 'app' })
+    expect(v.size).toBe(0)
   })
 })

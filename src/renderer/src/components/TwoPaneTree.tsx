@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import type { CompareNode, CompareResult, Side } from '../../../shared/types'
+import type { CompareNode, CompareResult, DiffStatus, Side } from '../../../shared/types'
 import { ancestorsOf, collectDirRelPaths } from '../../../shared/nav'
 import { churnByDir, type Churn } from '../../../shared/churn'
 import { defaultExpanded, flatten, formatSize, formatTime, statusClass } from '../lib/treeUtils'
@@ -15,6 +15,8 @@ const OVERSCAN = 12
 interface Props {
   result: CompareResult
   hideIdentical: boolean
+  /** Categories (different/leftOnly/rightOnly) hidden by the status-bar filter chips. */
+  hiddenStatuses?: ReadonlySet<DiffStatus>
   selectedRelPath: string | null
   /** When set, expand ancestors and scroll this relPath into view. */
   reveal: { relPath: string; nonce: number } | null
@@ -54,8 +56,8 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
   }, [])
 
   const rows = useMemo(
-    () => flatten(result.root, expanded, props.hideIdentical, nameFilter),
-    [result, expanded, props.hideIdentical, nameFilter]
+    () => flatten(result.root, expanded, props.hideIdentical, nameFilter, props.hiddenStatuses),
+    [result, expanded, props.hideIdentical, nameFilter, props.hiddenStatuses]
   )
 
   // Per-directory change density (folder churn heatmap).
@@ -68,7 +70,7 @@ export function TwoPaneTree(props: Props): React.JSX.Element {
     const next = new Set(expanded)
     for (const a of ancestorsOf(reveal.relPath)) next.add(a)
     setExpanded(next)
-    const freshRows = flatten(result.root, next, props.hideIdentical, nameFilter)
+    const freshRows = flatten(result.root, next, props.hideIdentical, nameFilter, props.hiddenStatuses)
     const idx = freshRows.findIndex((r) => r.node.relPath === reveal.relPath)
     const scroller = scrollerRef.current
     if (idx >= 0 && scroller) {

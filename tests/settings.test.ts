@@ -121,6 +121,14 @@ describe('coerceSettings', () => {
     expect(coerceSettings({ showWhitespace: 'yes' }).showWhitespace).toBe(false)
   })
 
+  it('keeps only valid filterable hiddenCategories (never identical)', () => {
+    expect(coerceSettings({}).hiddenCategories).toEqual([])
+    expect(
+      coerceSettings({ hiddenCategories: ['different', 'leftOnly', 'identical', 'bogus', 42] }).hiddenCategories
+    ).toEqual(['different', 'leftOnly'])
+    expect(coerceSettings({ hiddenCategories: 'different' }).hiddenCategories).toEqual([])
+  })
+
   it('validates window bounds', () => {
     expect(coerceSettings({ windowBounds: { x: 1, y: 2, width: 800, height: 600 } }).windowBounds).toEqual({
       x: 1,

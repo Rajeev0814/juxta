@@ -2,6 +2,7 @@ import {
   DEFAULT_OPTIONS,
   type CompareMethod,
   type CompareOptions,
+  type DiffStatus,
   type FileTypeRule,
   type FilterOptions
 } from './types'
@@ -34,6 +35,8 @@ export interface PersistedSettings {
   hideIdentical: boolean
   /** Render tabs/spaces as visible glyphs in the text diff editors. */
   showWhitespace: boolean
+  /** Folder-tree categories hidden by the status-bar filter chips (never 'identical'). */
+  hiddenCategories: DiffStatus[]
   useTrash: boolean
   windowBounds: WindowBounds | null
   profiles: CompareProfile[]
@@ -50,6 +53,7 @@ export function defaultSettings(): PersistedSettings {
     theme: 'dark',
     hideIdentical: false,
     showWhitespace: false,
+    hiddenCategories: [],
     useTrash: true,
     windowBounds: null,
     profiles: [],
@@ -148,6 +152,16 @@ function coerceProfiles(raw: unknown): CompareProfile[] {
   return out
 }
 
+/** Folder categories that can be filtered out (identical is handled by hideIdentical). */
+const FILTERABLE_CATEGORIES: DiffStatus[] = ['different', 'leftOnly', 'rightOnly']
+
+function coerceHiddenCategories(raw: unknown): DiffStatus[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter(
+    (x): x is DiffStatus => typeof x === 'string' && (FILTERABLE_CATEGORIES as string[]).includes(x)
+  )
+}
+
 function coerceProjectScopes(raw: unknown): ProjectScope[] {
   if (!Array.isArray(raw)) return []
   const out: ProjectScope[] = []
@@ -200,6 +214,7 @@ export function coerceSettings(raw: unknown): PersistedSettings {
   if (raw.theme === 'light' || raw.theme === 'dark') s.theme = raw.theme
   if (typeof raw.hideIdentical === 'boolean') s.hideIdentical = raw.hideIdentical
   if (typeof raw.showWhitespace === 'boolean') s.showWhitespace = raw.showWhitespace
+  s.hiddenCategories = coerceHiddenCategories(raw.hiddenCategories)
   if (typeof raw.useTrash === 'boolean') s.useTrash = raw.useTrash
   s.windowBounds = coerceBounds(raw.windowBounds)
   s.profiles = coerceProfiles(raw.profiles)
