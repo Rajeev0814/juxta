@@ -69,4 +69,23 @@ describe('hashFile', () => {
     const hb = await hashFile(join(root, 'b.xml'), opts)
     expect(ha).toBe(hb)
   })
+
+  it('canonicalizes .lua files by AST when normalizeCode is set (comments/formatting ignored)', async () => {
+    const root = await makeTree({
+      'a.lua': '-- greet\nlocal x = 1\nfunction f(a) return a+1 end',
+      'b.lua': 'local x = 1;\nfunction f(a)\n  return a + 1\nend'
+    })
+    const opts = { ignoreWhitespace: false, ignoreCase: false, normalizeCode: true }
+    const ha = await hashFile(join(root, 'a.lua'), opts)
+    const hb = await hashFile(join(root, 'b.lua'), opts)
+    expect(ha).toBe(hb)
+  })
+
+  it('keeps semantically different .lua files distinct under normalizeCode', async () => {
+    const root = await makeTree({ 'a.lua': 'local x = 1', 'b.lua': 'local x = 2' })
+    const opts = { ignoreWhitespace: false, ignoreCase: false, normalizeCode: true }
+    const ha = await hashFile(join(root, 'a.lua'), opts)
+    const hb = await hashFile(join(root, 'b.lua'), opts)
+    expect(ha).not.toBe(hb)
+  })
 })

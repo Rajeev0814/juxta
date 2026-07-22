@@ -7,6 +7,7 @@ import { canonicalizeYaml } from './yaml'
 import { canonicalizeXml } from './xml'
 import { canonicalizeCode } from './code'
 import { isCodePath } from '../shared/jsast'
+import { isLuaPath, canonicalizeLua } from '../shared/luaast'
 
 export interface HashOptions {
   ignoreWhitespace: boolean
@@ -23,7 +24,7 @@ export interface HashOptions {
   normalizeYaml?: boolean
   /** Canonicalize .xml files (sorted keys/attrs, formatting-independent) before hashing. */
   normalizeXml?: boolean
-  /** Canonicalize .js/.mjs/.cjs files by AST (ignore comments/formatting) before hashing. */
+  /** Canonicalize code files by AST (ignore comments/formatting) before hashing — JS/TS family and Lua. */
   normalizeCode?: boolean
 }
 
@@ -87,6 +88,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
   const wantYaml = !!options.normalizeYaml && /\.ya?ml$/i.test(filePath)
   const wantXml = !!options.normalizeXml && /\.xml$/i.test(filePath)
   const wantCode = !!options.normalizeCode && isCodePath(filePath)
+  const wantLua = !!options.normalizeCode && isLuaPath(filePath)
   const csvDelimiter = /\.tsv$/i.test(filePath) ? '\t' : /\.csv$/i.test(filePath) ? ',' : null
   const wantCsv = !!options.normalizeCsv && csvDelimiter !== null
   if (
@@ -98,6 +100,7 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
     !wantYaml &&
     !wantXml &&
     !wantCode &&
+    !wantLua &&
     !wantCsv
   ) {
     return hashFileRaw(filePath)
@@ -140,6 +143,15 @@ export async function hashFile(filePath: string, options: HashOptions): Promise<
       return createHash('sha1').update(out).digest('hex')
     }
     // Not parseable JS — fall through to the regular normalizers.
+  }
+
+  if (wantLua) {
+    const canonical = canonicalizeLua(text)
+    if (canonical !== null) {
+      const out = options.ignoreCase ? canonical.toLowerCase() : canonical
+      return createHash('sha1').update(out).digest('hex')
+    }
+    // Not parseable Lua — fall through to the regular normalizers.
   }
 
   if (wantCsv && csvDelimiter !== null) {

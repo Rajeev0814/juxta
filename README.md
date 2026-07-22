@@ -25,7 +25,7 @@ Open a tab from the **+** menu (Folder / File / Text / 3-Way Folders):
   - **PDF & Office** (pdf/docx/xlsx/pptx) → extracted-text diff
   - **archives** (zip/jar/tar/tgz/tar.gz) → content-tree compare; double-click an entry to diff it
   - **tables** (csv/tsv) → key-column-aligned row/cell compare
-  - **structured** (json/yaml/xml) → key-aligned tree; **js/ts** (+jsx/tsx) → text ⇄ **AST** toggle
+  - **structured** (json/yaml/xml) → key-aligned tree; **js/ts** (+jsx/tsx) & **lua** → text ⇄ **AST** toggle
   - anything else → Monaco text diff (or hex for binary; a windowed hex viewer for huge files)
 - **Text compare** — two editable panes; paste and diff live, copy sections across, apply a patch.
 - **3-Way Folders** — base / left / right classification (modified/added/deleted/**conflict**);
