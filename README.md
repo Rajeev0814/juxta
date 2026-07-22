@@ -19,7 +19,8 @@ Open a tab from the **+** menu (Folder / File / Text / 3-Way Folders):
 - **Folder compare** — synchronized two-pane tree, color-coded *identical / different / left-only /
   right-only* with a *newer* marker, moved/renamed detection, and a per-directory **churn heatmap**.
   Merge actions: copy ←/→, delete orphans, one-click **make folders match**, and **sync**
-  (mirror / update / two-way) with a dry-run preview.
+  (mirror / update / two-way) with a dry-run preview. A **filter box** above the tree narrows it
+  to files whose name matches as you type.
 - **File compare** — the comparator is **auto-detected** from the file types:
   - **images** (png/jpg/gif/webp…) → side-by-side, opacity overlay, swipe, and pixel-diff heatmap
   - **PDF & Office** (pdf/docx/xlsx/pptx) → extracted-text diff
