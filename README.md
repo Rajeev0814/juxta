@@ -55,6 +55,17 @@ size+timestamp, or quick (size only).
   then **"Compare with Selected"** on another (files or folders).
 - **FTP/FTPS** — put an `ftp://[user@]host/path` URL on a Folder Compare side; Juxta mirrors it to a
   temp folder and compares. You're prompted for the password (not saved).
+- **Format converters** — teach Juxta to text-compare file types it doesn't natively handle by mapping
+  an extension to an external command that emits plain text on stdout (same trust model as a git
+  difftool — you configure the command; it's spawned directly, no shell). Add entries to `converters`
+  in the settings file (`%APPDATA%/juxta/juxta-settings.json`), e.g.:
+  ```json
+  "converters": [
+    { "name": "RTF", "extensions": ["rtf"], "command": "unrtf", "args": ["--text", "${file}"] }
+  ]
+  ```
+  A matching pair then opens in a read-only extracted-text diff. Built-in comparators
+  (image/PDF/Office/table/structured) still take precedence; converters handle the rest.
 - **CLI** — headless folder compare:
   ```
   Juxta --cli <left> <right> [--out report.html|.csv] [--method content|sizeAndTime|quick] \
