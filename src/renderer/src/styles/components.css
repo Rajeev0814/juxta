@@ -921,6 +921,21 @@
   align-items: center;
   gap: 4px;
 }
+/* Clickable category filter chips reuse the plain count look (no button chrome). */
+.sb-counts button.chip {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+.sb-counts button.chip:hover {
+  text-decoration: underline;
+}
+.sb-counts button.chip.off {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
 .c-different {
   color: var(--st-different);
 }

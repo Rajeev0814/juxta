@@ -23,20 +23,36 @@ export function defaultExpanded(root: CompareNode): Set<string> {
   return set
 }
 
+/** Filters that decide which folder-tree nodes are visible. */
+export interface TreeFilterSpec {
+  /** Hide files with 'identical' status. */
+  hideIdentical: boolean
+  /** Hide files whose status is in this set (different / leftOnly / rightOnly). */
+  hiddenStatuses?: ReadonlySet<DiffStatus>
+  /** Show only files whose name contains this text (case-insensitive). */
+  nameFilter?: string
+}
+
+function fileVisible(node: CompareNode, f: TreeFilterSpec, q: string): boolean {
+  if (f.hideIdentical && node.status === 'identical') return false
+  if (f.hiddenStatuses && f.hiddenStatuses.has(node.status)) return false
+  if (q && !node.name.toLowerCase().includes(q)) return false
+  return true
+}
+
 /**
- * relPaths to show for a name filter: every file whose name contains `query`
- * (case-insensitive) plus all of their ancestor directories. Empty query → an
- * empty set (callers treat that as "no filtering"). Single-pass, pure.
+ * relPaths to show under the given filters: every file passing the filter plus
+ * all of their ancestor directories. Single-pass, pure. (A directory is shown
+ * only if it has at least one visible descendant file.)
  */
-export function visibleForNameFilter(root: CompareNode, query: string): Set<string> {
-  const q = query.trim().toLowerCase()
+export function visibleNodes(root: CompareNode, f: TreeFilterSpec): Set<string> {
+  const q = (f.nameFilter ?? '').trim().toLowerCase()
   const visible = new Set<string>()
-  if (!q) return visible
   const walk = (node: CompareNode): boolean => {
     if (node.kind === 'file') {
-      const match = node.name.toLowerCase().includes(q)
-      if (match) visible.add(node.relPath)
-      return match
+      const v = fileVisible(node, f, q)
+      if (v) visible.add(node.relPath)
+      return v
     }
     let any = false
     for (const child of node.children ?? []) {
@@ -49,30 +65,35 @@ export function visibleForNameFilter(root: CompareNode, query: string): Set<stri
   return visible
 }
 
+/** Back-compat helper: visible set for a name filter alone. */
+export function visibleForNameFilter(root: CompareNode, query: string): Set<string> {
+  return query.trim() ? visibleNodes(root, { hideIdentical: false, nameFilter: query }) : new Set()
+}
+
 /**
- * Flatten the tree into the visible rows given the expanded set, an optional
- * "hide identical" filter, and an optional name filter. Directories whose
- * entire subtree is identical are dropped when hideIdentical is on. When a
- * name filter is active, only matching files (and their ancestor dirs) show,
- * and those dirs are forced open so matches are visible.
+ * Flatten the tree into the visible rows given the expanded set and the active
+ * filters (hide-identical, per-category hide, and name filter). Directories
+ * with no visible descendant are dropped. A name filter additionally force-opens
+ * the surviving directories so matches are always visible.
  */
 export function flatten(
   root: CompareNode,
   expanded: Set<string>,
   hideIdentical: boolean,
-  nameFilter = ''
+  nameFilter = '',
+  hiddenStatuses?: ReadonlySet<DiffStatus>
 ): FlatRow[] {
   const rows: FlatRow[] = []
-  const filtering = nameFilter.trim().length > 0
-  const visible = filtering ? visibleForNameFilter(root, nameFilter) : null
+  const nameActive = nameFilter.trim().length > 0
+  const filtering = hideIdentical || nameActive || (!!hiddenStatuses && hiddenStatuses.size > 0)
+  const visible = filtering ? visibleNodes(root, { hideIdentical, hiddenStatuses, nameFilter }) : null
 
   const walk = (node: CompareNode, depth: number): void => {
     for (const child of node.children ?? []) {
-      if (hideIdentical && child.status === 'identical') continue
       if (visible && !visible.has(child.relPath)) continue
       const hasChildren = !!child.children && child.children.length > 0
-      // While filtering, force directories open so matches are always visible.
-      const isOpen = filtering ? true : expanded.has(child.relPath)
+      // A name filter force-opens dirs so matches show; other filters respect the expanded set.
+      const isOpen = nameActive ? true : expanded.has(child.relPath)
       rows.push({ node: child, depth, hasChildren, expanded: isOpen })
       if (hasChildren && isOpen) walk(child, depth + 1)
     }
