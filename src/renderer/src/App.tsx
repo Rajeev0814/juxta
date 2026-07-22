@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { CompareNode, CompareResult, Side } from '../../shared/types'
+import type { CompareNode, CompareResult, DiffStatus, Side } from '../../shared/types'
 import { listChangedFiles } from '../../shared/nav'
 import { planSync, planTimestamp, type SyncMode } from '../../shared/sync'
 import { toHtmlReport, toCsvReport } from '../../shared/report'
@@ -54,6 +54,7 @@ export default function App(): React.JSX.Element {
   const [theme, setTheme] = useState<Theme>('dark')
   const [hideIdentical, setHideIdentical] = useState(false)
   const [showWhitespace, setShowWhitespace] = useState(false)
+  const [hiddenCategories, setHiddenCategories] = useState<Set<DiffStatus>>(new Set())
   const [useTrash, setUseTrash] = useState(true)
 
   const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
@@ -119,6 +120,7 @@ export default function App(): React.JSX.Element {
       setTheme(s.theme)
       setHideIdentical(s.hideIdentical)
       setShowWhitespace(s.showWhitespace)
+      setHiddenCategories(new Set(s.hiddenCategories))
       setUseTrash(s.useTrash)
       setProfiles(s.profiles)
       setProjectScopes(s.projectScopes)
@@ -139,6 +141,7 @@ export default function App(): React.JSX.Element {
         theme,
         hideIdentical,
         showWhitespace,
+        hiddenCategories: [...hiddenCategories],
         useTrash,
         windowBounds: null,
         profiles,
@@ -147,7 +150,7 @@ export default function App(): React.JSX.Element {
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, showWhitespace, useTrash, profiles, projectScopes, converters])
+  }, [sessions, activeId, theme, hideIdentical, showWhitespace, hiddenCategories, useTrash, profiles, projectScopes, converters])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -736,6 +739,7 @@ export default function App(): React.JSX.Element {
                 key={active.id}
                 result={result}
                 hideIdentical={hideIdentical}
+                hiddenStatuses={hiddenCategories}
                 selectedRelPath={selectedRelPath}
                 reveal={reveal}
                 expandSignal={expandSignal}
@@ -901,6 +905,15 @@ export default function App(): React.JSX.Element {
         comparing={comparing}
         hideIdentical={hideIdentical}
         onToggleHideIdentical={setHideIdentical}
+        hiddenStatuses={hiddenCategories}
+        onToggleStatus={(s) =>
+          setHiddenCategories((prev) => {
+            const next = new Set(prev)
+            if (next.has(s)) next.delete(s)
+            else next.add(s)
+            return next
+          })
+        }
         useTrash={useTrash}
         onToggleTrash={setUseTrash}
       />
