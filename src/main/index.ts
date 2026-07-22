@@ -29,7 +29,7 @@ import { FolderWatcher } from './watchService'
 import { gitDiffToolCommands, gitMergeToolCommands, parseGitDiffArgs, parseGitMergeArgs } from '../shared/git'
 import { parseCompareWith, parseSelectLeft } from '../shared/shell'
 import type { ShellCompare } from '../shared/ipc'
-import { parseCliArgs, type CliOptions } from '../shared/cli'
+import { parseCliArgs, formatCliReport, type CliOptions } from '../shared/cli'
 import { compareFolders } from '../core/compare'
 import { toCsvReport, toHtmlReport } from '../shared/report'
 import { isFtpUrl, parseFtpUrl } from '../shared/ftp'
@@ -70,10 +70,7 @@ async function runCli(cli: CliOptions): Promise<void> {
     }
     const result = await compareFolders({ leftRoot: cli.left, rightRoot: cli.right, options })
     const s = result.summary
-    process.stdout.write(
-      `different=${s.different} leftOnly=${s.leftOnly} rightOnly=${s.rightOnly} ` +
-        `moved=${s.moved} identical=${s.identical} files=${s.totalFiles}\n`
-    )
+    process.stdout.write(formatCliReport(result, { quiet: cli.quiet, verbose: cli.verbose }) + '\n')
     if (cli.out) {
       const content = /\.csv$/i.test(cli.out) ? toCsvReport(result) : toHtmlReport(result)
       await writeFile(cli.out, content, 'utf8')
