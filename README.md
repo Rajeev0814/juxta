@@ -9,8 +9,8 @@ and drive it from git, the Explorer context menu, or the command line.
 
 Grab the latest Windows build from the [Releases page](https://github.com/Rajeev0814/juxta/releases/latest):
 
-- **[Juxta Setup (installer)](https://github.com/Rajeev0814/juxta/releases/latest/download/Juxta-0.1.0-x64.exe)** — installs to Program Files, adds Start Menu/Desktop shortcuts and the Explorer context menu.
-- **[Juxta Portable](https://github.com/Rajeev0814/juxta/releases/latest/download/Juxta-0.1.0-portable.exe)** — no installation, just run it.
+- **[Juxta Setup (installer)](https://github.com/Rajeev0814/juxta/releases/latest/download/Juxta-0.2.0-x64.exe)** — installs to Program Files, adds Start Menu/Desktop shortcuts and the Explorer context menu.
+- **[Juxta Portable](https://github.com/Rajeev0814/juxta/releases/latest/download/Juxta-0.2.0-portable.exe)** — no installation, just run it.
 
 ## Compare modes
 
