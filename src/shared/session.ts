@@ -60,6 +60,27 @@ export function sessionTitle(s: Session): string {
   return 'Text Compare'
 }
 
+/** A previously-run comparison, for the "Open recent" menu. Folders/files only. */
+export interface RecentComparison {
+  type: 'folders' | 'files'
+  left: string
+  right: string
+}
+
+function sameRecent(a: RecentComparison, b: RecentComparison): boolean {
+  return a.type === b.type && a.left === b.left && a.right === b.right
+}
+
+/**
+ * Prepend `entry` to the recents list (most-recent-first), removing any prior
+ * duplicate and capping the length. Pure; returns a new array.
+ */
+export function addRecent(list: RecentComparison[], entry: RecentComparison, max = 10): RecentComparison[] {
+  if (!entry.left || !entry.right) return list
+  const deduped = list.filter((r) => !sameRecent(r, entry))
+  return [entry, ...deduped].slice(0, max)
+}
+
 export const SESSION_ICON: Record<SessionType, string> = {
   folders: '📁',
   files: '📄',
