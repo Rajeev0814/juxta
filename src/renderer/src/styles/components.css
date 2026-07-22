@@ -91,6 +91,21 @@
 .new-menu button:hover {
   background: var(--row-hover);
 }
+.new-menu-sep {
+  padding: 5px 12px 3px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+}
+.new-menu button.recent-item {
+  font-size: 12px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .tab-bar .theme-btn {
   align-self: center;
   width: 34px;

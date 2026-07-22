@@ -34,6 +34,8 @@ Open a tab from the **+** menu (Folder / File / Text / 3-Way Folders):
 - **3-Way Folders** — base / left / right classification (modified/added/deleted/**conflict**);
   double-click a file to resolve it in the 3-way merge view.
 
+The **+** (new session) menu also lists your **recent** folder/file comparisons for one-click re-open.
+
 ## Filters & rules
 
 Glob include/exclude, ignore whitespace / case / blank lines, ignore-lines-by-regex, and

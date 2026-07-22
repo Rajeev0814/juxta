@@ -6,10 +6,12 @@ import { toHtmlReport, toCsvReport } from '../../shared/report'
 import type { CompareProfile, ProjectScope } from '../../shared/settings'
 import { findConverter, type FormatConverter } from '../../shared/converters'
 import {
+  addRecent,
   createSession,
   sessionTitle,
   SESSION_ICON,
   SESSION_LABEL,
+  type RecentComparison,
   type Session,
   type SessionType
 } from '../../shared/session'
@@ -55,6 +57,7 @@ export default function App(): React.JSX.Element {
   const [hideIdentical, setHideIdentical] = useState(false)
   const [showWhitespace, setShowWhitespace] = useState(false)
   const [hiddenCategories, setHiddenCategories] = useState<Set<DiffStatus>>(new Set())
+  const [recents, setRecents] = useState<RecentComparison[]>([])
   const [useTrash, setUseTrash] = useState(true)
 
   const [sessions, setSessions] = useState<Session[]>(() => [createSession('folders', 'session-0')])
@@ -121,6 +124,7 @@ export default function App(): React.JSX.Element {
       setHideIdentical(s.hideIdentical)
       setShowWhitespace(s.showWhitespace)
       setHiddenCategories(new Set(s.hiddenCategories))
+      setRecents(s.recents)
       setUseTrash(s.useTrash)
       setProfiles(s.profiles)
       setProjectScopes(s.projectScopes)
@@ -146,11 +150,12 @@ export default function App(): React.JSX.Element {
         windowBounds: null,
         profiles,
         projectScopes,
-        converters
+        converters,
+        recents
       })
     }, 400)
     return () => clearTimeout(t)
-  }, [sessions, activeId, theme, hideIdentical, showWhitespace, hiddenCategories, useTrash, profiles, projectScopes, converters])
+  }, [sessions, activeId, theme, hideIdentical, showWhitespace, hiddenCategories, useTrash, profiles, projectScopes, converters, recents])
 
   // Reset drill-down/navigation when switching sessions.
   useEffect(() => {
@@ -191,6 +196,16 @@ export default function App(): React.JSX.Element {
     [openFilesSession, openFoldersSession]
   )
 
+  // Re-open a comparison from the "Recent" menu into a fresh, pre-filled tab.
+  const openRecent = useCallback(
+    (r: RecentComparison): void => {
+      if (r.type === 'folders') openFoldersSession(r.left, r.right)
+      else openFilesSession(r.left, r.right)
+      setShowNew(false)
+    },
+    [openFoldersSession, openFilesSession]
+  )
+
   const closeSession = useCallback(
     (id: string): void => {
       setSessions((list) => {
@@ -213,13 +228,20 @@ export default function App(): React.JSX.Element {
   )
 
   // --- Folder comparison ----------------------------------------------------
+  const recordRecent = useCallback((entry: RecentComparison): void => {
+    setRecents((list) => addRecent(list, entry))
+  }, [])
+
   const execCompare = useCallback(
     async (password?: string) => {
       if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
       const res = await run(active.leftRoot, active.rightRoot, active.options, password)
-      if (res) setResults((r) => ({ ...r, [active.id]: res }))
+      if (res) {
+        setResults((r) => ({ ...r, [active.id]: res }))
+        recordRecent({ type: 'folders', left: active.leftRoot, right: active.rightRoot })
+      }
     },
-    [active, run]
+    [active, run, recordRecent]
   )
 
   /** The remote side needing a password prompt, or '' if none. */
@@ -240,6 +262,13 @@ export default function App(): React.JSX.Element {
     await execCompare()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, execCompare])
+
+  // Record a recent once a File Compare tab has both sides chosen.
+  useEffect(() => {
+    if (active.type === 'files' && active.leftFile && active.rightFile) {
+      recordRecent({ type: 'files', left: active.leftFile, right: active.rightFile })
+    }
+  }, [active.type, active.leftFile, active.rightFile, recordRecent])
 
   const refresh = useCallback(async () => {
     if (active.type !== 'folders' || !active.leftRoot || !active.rightRoot) return
@@ -622,6 +651,21 @@ export default function App(): React.JSX.Element {
                 </button>
               ))}
               <button onClick={() => addSession('folders3')}>{SESSION_ICON.folders3} {SESSION_LABEL.folders3}</button>
+              {recents.length > 0 && (
+                <>
+                  <div className="new-menu-sep">Recent</div>
+                  {recents.map((r, i) => (
+                    <button
+                      key={`${r.type}:${r.left}:${r.right}:${i}`}
+                      className="recent-item"
+                      onClick={() => openRecent(r)}
+                      title={`${r.left} ⇄ ${r.right}`}
+                    >
+                      {SESSION_ICON[r.type]} {basename(r.left) || '—'} ⇄ {basename(r.right) || '—'}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>
